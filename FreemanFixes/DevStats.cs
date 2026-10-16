@@ -66,6 +66,11 @@ namespace FreemanFixes
             Armor, Pistol, Smg, Shotgun, Rifle, AssaultRifle, MachineGun, Launcher, Throwing
         };
 
+        internal static readonly int[] CompanionStats =
+        {
+            Affection, GovLeadership, GovNavigation, GovTactics, GovMedical, GovFinancial, GovGoverning
+        };
+
         internal static readonly int[] WeaponsAndCompanion =
         {
             Armor, Pistol, Smg, Shotgun, Rifle, AssaultRifle, MachineGun, Launcher, Throwing,
@@ -141,6 +146,10 @@ namespace FreemanFixes
             if (stat == Level)
             {
                 return 100;
+            }
+            if (stat >= GovLeadership && stat <= GovGoverning)
+            {
+                return 10; // companion screen shows these as "x / 10" (HeroPoint)
             }
             return 99999;
         }

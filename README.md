@@ -55,7 +55,7 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   - **Companions:** you + every companion with status (in party / yours, away / prisoner / with a faction / free)
     and Edit / Recruit / "Recruit All Companions" (skips anyone already yours, per `Faction.GetAllHero`); stat editor
     for level, health, morale, unspent points, attributes, skills, weapon proficiency, affection and governor
-    stats, with Max All Attributes / Skills / Weapons.
+    stats (governor stats cap at 10), with Max All Attributes / Skills / Weapons / Companion Stats.
   - **Item store:** a trader with 7 of every item in category pages (the trade grid is a fixed 250 slots), page
     controls in the trade screen's top bar, restocks after each deal, `StoreFree` config / in-store toggle.
 

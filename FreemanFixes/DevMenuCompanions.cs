@@ -12,7 +12,7 @@ namespace FreemanFixes
         private const int ActTabCompanions = 12;
         private const int ActTabFactions = 16;
         private const int ActRecruitAll = 18;
-        private const int ActMaxGroup = 21; // arg: 0 attributes, 1 skills, 2 weapons
+        private const int ActMaxGroup = 21; // arg: 0 attributes, 1 skills, 2 weapons, 3 companion stats
         private const int ActSelect = 13;
         private const int ActRecruit = 14;
         private const int ActStat = 15;
@@ -104,6 +104,10 @@ namespace FreemanFixes
                 }
                 StatEditRow(c3, stat);
             }
+            Transform maxCompanion = Row(c3);
+            MakeButton(maxCompanion, "Max All Companion Stats", ActMaxGroup, 3).gameObject
+                .AddComponent<LayoutElement>().flexibleWidth = 1f;
+            companionOnlyRows[-2] = maxCompanion.gameObject;
             companionsPage.SetActive(false);
         }
 
@@ -244,12 +248,18 @@ namespace FreemanFixes
                 case ActMaxGroup:
                     HeroAgent mh = heroes[selected];
                     NPCGen mg = mh != null ? mh.gen : MapAgent.code.gen;
-                    int[] group = arg == 1 ? DevStats.Skills : (arg == 2 ? DevStats.Weapons : DevStats.Attributes);
+                    int[] group = arg == 1 ? DevStats.Skills : arg == 2 ? DevStats.Weapons
+                        : arg == 3 ? DevStats.CompanionStats : DevStats.Attributes;
+                    if (arg == 3 && mh == null)
+                    {
+                        return true; // companion-only stats
+                    }
                     foreach (int stat in group)
                     {
                         DevStats.Set(mg, mh, stat, DevStats.Max(stat));
                     }
-                    string what = arg == 1 ? "skills" : (arg == 2 ? "weapon proficiencies" : "attributes");
+                    string what = arg == 1 ? "skills" : arg == 2 ? "weapon proficiencies"
+                        : arg == 3 ? "companion stats" : "attributes";
                     DevActions.Report(DevStats.DisplayName(mg) + ": all " + what + " set to max");
                     Refresh();
                     return true;
