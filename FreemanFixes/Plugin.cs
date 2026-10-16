@@ -11,12 +11,16 @@ namespace FreemanFixes
         internal static ManualLogSource Log;
 
         private Harmony harmony;
+        private LiveLog liveLog;
 
         private void Awake()
         {
             Log = Logger;
+            liveLog = LiveLog.Start();
             LogTypeLoadErrors();
-            harmony = new Harmony("purgos.freeman.fixes");
+            // Unique per load: on a ScriptEngine reload the old copy's OnDestroy runs *after* the new copy's Awake,
+            // and UnpatchSelf on a shared ID would strip the new copy's patches too.
+            harmony = new Harmony("purgos.freeman.fixes." + System.DateTime.Now.Ticks);
             harmony.PatchAll();
             Logger.LogInfo("Freeman Slop Mod loaded");
         }
@@ -33,6 +37,10 @@ namespace FreemanFixes
             InfoPopupPatches.Restore();
             PartyLayoutPatches.Restore();
             Logger.LogInfo("Freeman Slop Mod unloaded");
+            if (liveLog != null)
+            {
+                liveLog.Dispose();
+            }
         }
 
         // The game's old Mono silently drops plugin types it can't load; say which and why.
