@@ -56,8 +56,9 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
     and Edit / Recruit / "Recruit All Companions" (skips anyone already yours, per `Faction.GetAllHero`); stat editor
     for level, health, morale, unspent points, attributes, skills, weapon proficiency, affection and governor
     stats (governor stats cap at 10), with Max All Attributes / Skills / Weapons / Companion Stats.
-  - **Item store:** a trader with 7 of every item in category pages (the trade grid is a fixed 250 slots), page
-    controls in the trade screen's top bar, restocks after each deal, `StoreFree` config / in-store toggle.
+  - **Item store:** a trader with one of every item that never runs out (restocked after every click, keeping
+    anything you sold so Revert works), in category pages of up to 200 (the trade grid is a fixed 250 slots); page
+    controls in the trade screen's top bar, `StoreFree` config / in-store toggle.
 
 ## Ideas / TODO
 - Diplomacy "Give money / Ask money / Persuade" (`UIPolitical`) confirm does nothing — unimplemented in vanilla.

@@ -218,7 +218,7 @@ namespace FreemanFixes
             Spacer(col, 16f);
             Header(col, "Tools");
             Transform storeRow = Row(col);
-            Button store = MakeButton(storeRow, "Item Store (7 of every item)", ActStore, 0);
+            Button store = MakeButton(storeRow, "Item Store (endless, one of each)", ActStore, 0);
             store.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             Transform freeRow = Row(col);
             Button free = MakeButton(freeRow, "", ActStoreFree, 0);

@@ -20,7 +20,7 @@ namespace FreemanFixes
         {
             Enabled = config.Bind("Dev Mode", "Enabled", false,
                 "Adds dev controls to the game's cheat panel (End key): set money/reputation/morale/XP, faction money " +
-                "and relations, add troops, and an item store with 7 of every item.");
+                "and relations, add troops, and an endless item store.");
             StoreFree = config.Bind("Dev Mode", "StoreFree", true,
                 "Items in the dev store cost nothing (also toggleable in the store).");
         }
@@ -143,6 +143,13 @@ namespace FreemanFixes
             {
                 __result = 0;
             }
+        }
+
+        // Every click in the trade screen goes through InventorySlot.Select; keep the dev store's stock endless.
+        [HarmonyPostfix, HarmonyPatch(typeof(InventorySlot), nameof(InventorySlot.Select))]
+        private static void AfterSlotClick()
+        {
+            DevStore.RestockAfterClick();
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(UITrading), nameof(UITrading.Deal))]

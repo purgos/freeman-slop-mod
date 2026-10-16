@@ -5,14 +5,15 @@ using UnityEngine.UI;
 
 namespace FreemanFixes
 {
-    // Dev item store: a standalone trader (Storage + Merchant, opened via the game's own Merchant.Trade) stocked with
-    // 7 of every item. The trade screen's merchant grid is a fixed 250 slots (Inventory.Initiate), so stock is split
-    // into category pages of 35 items (245 slots). Page and Free controls are clones of the screen's Deal button,
-    // placed in the free right half of its top bar. Restocks after every deal; Free zeroes Item.GetBuyCost.
+    // Dev item store: a standalone trader (Storage + Merchant, opened via the game's own Merchant.Trade) with one of
+    // every item that never runs out: after every click in the trade screen the page is restocked (taking an item
+    // from a trader removes it and compacts the list, InventorySlot.Select), keeping anything you sold to it so
+    // Revert still works. The merchant grid is a fixed 250 slots (Inventory.Initiate), so stock is split into category
+    // pages of up to 200 items, leaving room to sell. Page and Free controls are clones of the screen's Deal button in
+    // the free right half of its top bar. Free zeroes Item.GetBuyCost.
     internal class DevStore : MonoBehaviour
     {
-        private const int Copies = 7;
-        private const int ItemsPerPage = 35; // 35 * 7 = 245 <= 250 merchant slots
+        private const int ItemsPerPage = 200; // of the 250 merchant slots; the rest takes items you sell
         private const int Slots = 250;
         private const int StoreCredits = 99999999;
         private const string RowName = "FreemanSlop_StoreControls";
@@ -190,21 +191,10 @@ namespace FreemanFixes
             }
         }
 
+        // Full reset to one of each page item (opening, page change, after a deal).
         private void Fill()
         {
-            var stock = new List<int>(Slots);
-            foreach (int id in pages[page])
-            {
-                for (int c = 0; c < Copies; c++)
-                {
-                    stock.Add(id);
-                }
-            }
-            while (stock.Count < Slots)
-            {
-                stock.Add(0);
-            }
-            storage.items = stock;
+            storage.items = PageStock(null);
             storage.maxSlots = Slots;
             storage.tempItems.Clear();
             storage.credits = StoreCredits;
@@ -213,6 +203,62 @@ namespace FreemanFixes
                 storage.inventory.Refresh();
             }
             UpdateLabels();
+        }
+
+        // After a click: one of each page item again, in order, followed by whatever else is in the store (items you
+        // sold, still pending in the trade). Leaves the game's temp-item bookkeeping alone so Revert/Deal still work.
+        private void Restock()
+        {
+            storage.items = PageStock(storage.items);
+            if (storage.inventory != null)
+            {
+                storage.inventory.Refresh();
+            }
+        }
+
+        private List<int> PageStock(List<int> current)
+        {
+            List<int> pageIds = pages[page];
+            var stock = new List<int>(Slots);
+            stock.AddRange(pageIds);
+            if (current != null)
+            {
+                // Keep extras: anything beyond one copy of each page item.
+                var counts = new Dictionary<int, int>();
+                foreach (int id in pageIds)
+                {
+                    counts[id] = 1;
+                }
+                foreach (int id in current)
+                {
+                    if (id == 0)
+                    {
+                        continue;
+                    }
+                    int left;
+                    if (counts.TryGetValue(id, out left) && left > 0)
+                    {
+                        counts[id] = left - 1; // this copy is the one already in the page stock
+                    }
+                    else if (stock.Count < Slots)
+                    {
+                        stock.Add(id);
+                    }
+                }
+            }
+            while (stock.Count < Slots)
+            {
+                stock.Add(0);
+            }
+            return stock;
+        }
+
+        internal static void RestockAfterClick()
+        {
+            if (IsOpen())
+            {
+                Instance.Restock();
+            }
         }
 
         internal void Turn(int delta)
