@@ -13,6 +13,8 @@ Requires owning the game; this repo never contains game files (`decompiled/` is 
 Uninstall: delete `winhttp.dll`, `doorstop_config.ini`, `.doorstop_version`, `BepInEx/` from the game folder.
 
 ## UI conventions (standard for all UI work)
+AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules.
+
 - **Native look, always.** New/changed UI is built in the game's own uGUI, never IMGUI/`OnGUI` overlays: clone the
   game's existing elements (buttons, panel backgrounds, `Text` fonts) with `Instantiate` and relabel/rewire them,
   so font, outline, hover/press states and colors match exactly. Accent color = the game's orange
