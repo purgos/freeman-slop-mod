@@ -46,6 +46,16 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   and ran off the bottom at high resolutions).
 - **Party screen layout** (`PartyLayoutPatches.cs`): the soldier info/loadout panel (`UICombat.unitInfoPanel`) is
   lifted to just under the top menu bar while the party screen is open, so item popups fit; restored elsewhere.
+- **Dev mode** (`DevMode.cs`, `DevMenu*.cs`, `DevStats.cs`, `DevActions.cs`, `DevStore.cs`), off by default — enable
+  with `[Dev Mode] Enabled = true` in `BepInEx/config/purgos.freeman.fixes.cfg`. In the vanilla cheat panel (End key)
+  "Add All Items" becomes **Dev Menu** and the give-all / add-money / add-XP / Neutrality / Wood-Iron buttons are
+  hidden. The full-screen menu (built from the game's own panel, header, row and button styles) has tabs:
+  - **General:** set money, reputation, morale, XP; item store + free-prices toggle; add any soldier type (count).
+  - **Factions:** relation and money per faction; "Make All Factions Neutral".
+  - **Companions:** you + every companion with Edit / Recruit / "Recruit All Companions"; stat editor for level,
+    health, morale, unspent points, attributes, skills, weapon proficiency, affection and governor stats.
+  - **Item store:** a trader with 7 of every item in category pages (the trade grid is a fixed 250 slots), page
+    controls in the trade screen's top bar, restocks after each deal, `StoreFree` config / in-store toggle.
 
 ## Ideas / TODO
 - Diplomacy "Give money / Ask money / Persuade" (`UIPolitical`) confirm does nothing — unimplemented in vanilla.

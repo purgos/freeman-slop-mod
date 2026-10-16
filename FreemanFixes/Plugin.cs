@@ -22,6 +22,8 @@ namespace FreemanFixes
             // and UnpatchSelf on a shared ID would strip the new copy's patches too.
             harmony = new Harmony("purgos.freeman.fixes." + System.DateTime.Now.Ticks);
             harmony.PatchAll();
+            DevMode.Bind(Config);
+            DevMode.AttachToExisting();
             Logger.LogInfo("Freeman Slop Mod loaded");
         }
 
@@ -36,6 +38,7 @@ namespace FreemanFixes
             DepositPanelUi.TeardownCurrent();
             InfoPopupPatches.Restore();
             PartyLayoutPatches.Restore();
+            DevMode.Teardown();
             Logger.LogInfo("Freeman Slop Mod unloaded");
             if (liveLog != null)
             {
