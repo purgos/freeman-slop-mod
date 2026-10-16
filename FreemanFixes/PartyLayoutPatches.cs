@@ -1,5 +1,6 @@
 using HarmonyLib;
 using UnityEngine;
+using UnityEngine.UI;
 
 namespace FreemanFixes
 {
@@ -9,7 +10,7 @@ namespace FreemanFixes
     [HarmonyPatch(typeof(UICombat), nameof(UICombat.ShowUnitInfo))]
     internal static class PartyLayoutPatches
     {
-        private const float TopBarFraction = 0.065f; // top menu bar height as a fraction of the screen
+        private const float TopBarFraction = 0.06f; // top menu bar (~5% of screen) plus a small gap
 
         private static RectTransform panel;
         private static Vector2 originalPos;
@@ -46,15 +47,32 @@ namespace FreemanFixes
             }
             canvas = canvas.rootCanvas;
             Camera cam = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
-            var corners = new Vector3[4];
-            rt.GetWorldCorners(corners);
-            float topOnScreen = RectTransformUtility.WorldToScreenPoint(cam, corners[1]).y;
+            float topOnScreen = VisibleTop(rt, cam);
             float desiredTop = Screen.height * (1f - TopBarFraction);
             float lift = (desiredTop - topOnScreen) / canvas.scaleFactor;
             if (lift > 0f)
             {
                 rt.anchoredPosition = originalPos + new Vector2(0f, lift);
             }
+        }
+
+        // The panel's header (portrait, orange rule) is drawn above its own rect, so measure the highest visible
+        // graphic in it rather than the rect itself.
+        private static float VisibleTop(RectTransform rt, Camera cam)
+        {
+            var corners = new Vector3[4];
+            rt.GetWorldCorners(corners);
+            float top = RectTransformUtility.WorldToScreenPoint(cam, corners[1]).y;
+            foreach (Graphic g in rt.GetComponentsInChildren<Graphic>(false))
+            {
+                if (!g.enabled || g.color.a <= 0f)
+                {
+                    continue;
+                }
+                g.rectTransform.GetWorldCorners(corners);
+                top = Mathf.Max(top, RectTransformUtility.WorldToScreenPoint(cam, corners[1]).y);
+            }
+            return top;
         }
 
         // Put it back when leaving the party screen so other screens keep the vanilla layout.

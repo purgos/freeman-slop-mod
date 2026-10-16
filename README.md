@@ -33,10 +33,11 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   side even when the debit failed. First open logs the panel hierarchy to `LogOutput.log` for layout tuning.
 - **Info popup** (`InfoPopupPatches.cs`): compacted — lines sit in a `GridLayoutGroup` (300x40 cells), shrunk to
   font×1.4 with no spacing; the popup height follows the cell height. Armor-proficiency line no longer clips its number.
+- **Popup placement** (`PopupPlacementPatches.cs`): the item info popup opens upward from the cursor, measured from
+  what's actually drawn, and stays on screen below the top menu bar (vanilla mixed canvas units with screen pixels
+  and ran off the bottom at high resolutions).
 - **Party screen layout** (`PartyLayoutPatches.cs`): the soldier info/loadout panel (`UICombat.unitInfoPanel`) is
   lifted to just under the top menu bar while the party screen is open, so item popups fit; restored elsewhere.
-- **Overscroll** (`OverscrollPatches.cs`): every vertical `ScrollRect` whose content uses a LayoutGroup +
-  ContentSizeFitter gets bottom padding = 35% of the viewport, so the last rows can scroll up for their popups.
 
 ## Ideas / TODO
 - Diplomacy "Give money / Ask money / Persuade" (`UIPolitical`) confirm does nothing — unimplemented in vanilla.
