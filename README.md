@@ -6,8 +6,12 @@ Requires owning the game; this repo never contains game files (`decompiled/` is 
 ## Setup (Linux / Proton)
 1. BepInEx 5.4.23.2 win_x64 is unpacked into the game folder (`winhttp.dll`, `doorstop_config.ini`, `BepInEx/`).
 2. Steam → game → Properties → Launch Options: `WINEDLLOVERRIDES="winhttp=n,b" %command%`
-3. `./install.sh` builds and copies `FreemanFixes.dll` into `BepInEx/plugins/` and `FreemanFixes.Patcher.dll`
-   into `BepInEx/patchers/`.
+3. `./install.sh` builds both DLLs; the preloader patcher goes to `BepInEx/patchers/`.
+   - **Dev (default):** the plugin goes to `BepInEx/scripts/` and is hot-reloaded by ScriptEngine
+     (BepInEx.Debug **r11.1**, unpack `ScriptEngine_r11.1.zip` into `vendor/scriptengine/`). `install.sh` copies
+     `ScriptEngine.dll` into `plugins/` and enables `LoadOnStart` + `EnableFileSystemWatcher`, so re-running
+     `./install.sh` reloads the mod in the running game (F6 also reloads). Only patcher changes need a restart.
+   - **Release:** `./install.sh --release` puts the plugin in `BepInEx/plugins/` (no ScriptEngine needed).
 4. Log: `<game>/BepInEx/LogOutput.log` (look for "Freeman Slop Mod loaded").
 
 Uninstall: delete `winhttp.dll`, `doorstop_config.ini`, `.doorstop_version`, `BepInEx/` from the game folder.

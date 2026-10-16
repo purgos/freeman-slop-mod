@@ -22,6 +22,15 @@ namespace FreemanFixes
         private InputField input;
         private bool syncing;
 
+        // What Build changed, so Teardown can put the game's panel back exactly (ScriptEngine hot reload).
+        private GameObject inputGo;
+        private GameObject rowGo;
+        private RectTransform amountRt;
+        private Transform amountParent;
+        private int amountSibling;
+        private Vector2 amountAnchorMin, amountAnchorMax, amountPivot, amountPos, amountSize;
+        private bool amountRichText;
+
         internal static void Ensure(UIData ui)
         {
             if (ui == null || ui.depositPanel == null)
@@ -91,6 +100,16 @@ namespace FreemanFixes
             var go = new GameObject("FreemanFixes_AmountInput", typeof(RectTransform));
             var rt = (RectTransform)go.transform;
             var textRt = (RectTransform)amountText.transform;
+            inputGo = go;
+            amountRt = textRt;
+            amountParent = textRt.parent;
+            amountSibling = textRt.GetSiblingIndex();
+            amountAnchorMin = textRt.anchorMin;
+            amountAnchorMax = textRt.anchorMax;
+            amountPivot = textRt.pivot;
+            amountPos = textRt.anchoredPosition;
+            amountSize = textRt.sizeDelta;
+            amountRichText = amountText.supportRichText;
             rt.SetParent(textRt.parent, false);
             rt.SetSiblingIndex(textRt.GetSiblingIndex());
             CopyRect(textRt, rt);
@@ -127,6 +146,7 @@ namespace FreemanFixes
             float pad = 8f;
 
             var row = new GameObject(RootName, typeof(RectTransform));
+            rowGo = row;
             var rowRt = (RectTransform)row.transform;
             rowRt.SetParent(panelRt, false);
             // Full panel width, hanging directly below it.
@@ -175,6 +195,44 @@ namespace FreemanFixes
                 pctBtn.Percent = pct;
                 b.onClick.AddListener(new UnityAction(pctBtn.Click));
             }
+        }
+
+        // Undo everything Build did: move the game's amount Text back where it was and remove our objects.
+        internal static void TeardownCurrent()
+        {
+            if (Current != null)
+            {
+                Current.Teardown();
+                Current = null;
+            }
+        }
+
+        private void Teardown()
+        {
+            if (amountRt != null && amountParent != null)
+            {
+                amountRt.SetParent(amountParent, false);
+                amountRt.SetSiblingIndex(amountSibling);
+                amountRt.anchorMin = amountAnchorMin;
+                amountRt.anchorMax = amountAnchorMax;
+                amountRt.pivot = amountPivot;
+                amountRt.anchoredPosition = amountPos;
+                amountRt.sizeDelta = amountSize;
+                Text amountText = amountRt.GetComponent<Text>();
+                if (amountText != null)
+                {
+                    amountText.supportRichText = amountRichText;
+                }
+            }
+            if (inputGo != null)
+            {
+                Destroy(inputGo);
+            }
+            if (rowGo != null)
+            {
+                Destroy(rowGo);
+            }
+            Destroy(this);
         }
 
         private static void CopyRect(RectTransform from, RectTransform to)

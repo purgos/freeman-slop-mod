@@ -43,7 +43,10 @@ Breaking these compiles fine but fails in game, usually silently or as a white o
 
 ## Workflow
 - Understand the game code first: decompile with `ilspycmd` into `decompiled/` (git-ignored) and cite what you find.
-- Build and install with `./install.sh`; verify through `BepInEx/LogOutput.log` and the Unity `output_log.txt`
+- Build and install with `./install.sh` (dev mode hot-reloads via ScriptEngine; no restart except for the patcher).
+  Hot reload only works if the plugin undoes itself: anything that changes game state or UI must record the original
+  and restore it from `Plugin.OnDestroy` (see `DepositPanelUi.TeardownCurrent`, `InfoPopupPatches.Restore`).
+- Verify through `BepInEx/LogOutput.log` and the Unity `output_log.txt`
   (paths in README). Ask the user for an in-game screenshot to confirm UI changes; don't claim they work unseen.
 - Keep `README.md` current: add each fix under **Fixes** and each new pitfall under **Runtime gotchas**.
 

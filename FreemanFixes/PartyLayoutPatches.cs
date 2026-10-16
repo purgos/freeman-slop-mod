@@ -79,6 +79,11 @@ namespace FreemanFixes
         [HarmonyPostfix, HarmonyPatch(typeof(UIParty), "OnDisable")]
         private static void PartyClosed()
         {
+            Restore();
+        }
+
+        internal static void Restore()
+        {
             if (panel != null && haveOriginal)
             {
                 panel.anchoredPosition = originalPos;

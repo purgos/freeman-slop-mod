@@ -7,15 +7,20 @@ namespace FreemanFixes
 {
     // Item info popup (UICombat.ShowInfo → CreateLine into descriptionHolder).
     //  - Compact: the popup's height is recomputed every frame as InitHeight + lineCount * (first line's height)
-    //    (UICombat.FixedUpdate), so tightening the line template + holder spacing shrinks the whole popup.
+    //    (UICombat.FixedUpdate), so shrinking the line grid's cells shrinks the whole popup.
     //  - Armor requirement: vanilla appends the number to "Armor Proficiency Required:", but the line can clip it;
     //    rewrite it so the number always shows (red/green colouring is left to the game).
     [HarmonyPatch(typeof(UICombat), nameof(UICombat.ShowInfo))]
     internal static class InfoPopupPatches
     {
-        private const float LineHeightPerFontPx = 1.2f;     // line box = font size * this
         private const float GridLineHeightPerFontPx = 1.4f; // grid cells: a little more, wrapped lines get no 2nd row
         private static bool compacted;
+
+        // Originals, restored on unload (ScriptEngine hot reload).
+        private static GridLayoutGroup grid;
+        private static Vector2 gridCell, gridSpacing;
+        private static Text prefabText;
+        private static float prefabLineSpacing;
 
         private static void Postfix(UICombat __instance)
         {
@@ -28,52 +33,40 @@ namespace FreemanFixes
             FixArmorLines(__instance);
         }
 
+        // Lines are cells of a GridLayoutGroup ("bg", 300x40): the cell size, not the line prefab, sets line height.
         private static void Compact(UICombat ui)
         {
-            Transform prefab = ui.descriptionLinePrefab;
-            Text prefabText = prefab != null ? prefab.GetComponent<Text>() : null;
-
-            // Lines live in a GridLayoutGroup ("bg", 300x40 cells): the cell size is what actually sets line height.
-            var grid = ui.descriptionHolder != null ? ui.descriptionHolder.GetComponent<GridLayoutGroup>() : null;
-            if (grid != null && prefabText != null)
-            {
-                float cell = Mathf.Ceil(prefabText.fontSize * GridLineHeightPerFontPx);
-                if (grid.cellSize.y > cell)
-                {
-                    grid.cellSize = new Vector2(grid.cellSize.x, cell);
-                }
-                grid.spacing = new Vector2(grid.spacing.x, 0f);
-                Plugin.Log.LogInfo("Info popup grid cell -> " + grid.cellSize);
-            }
-            Text text = prefab != null ? prefab.GetComponent<Text>() : null;
-            if (text == null)
+            prefabText = ui.descriptionLinePrefab != null ? ui.descriptionLinePrefab.GetComponent<Text>() : null;
+            grid = ui.descriptionHolder != null ? ui.descriptionHolder.GetComponent<GridLayoutGroup>() : null;
+            if (prefabText == null || grid == null)
             {
                 return;
             }
-            text.lineSpacing = Mathf.Min(text.lineSpacing, 0.9f);
-            if (prefab.GetComponent<ContentSizeFitter>() != null)
+            gridCell = grid.cellSize;
+            gridSpacing = grid.spacing;
+            prefabLineSpacing = prefabText.lineSpacing;
+
+            float cell = Mathf.Ceil(prefabText.fontSize * GridLineHeightPerFontPx);
+            grid.cellSize = new Vector2(gridCell.x, Mathf.Min(gridCell.y, cell));
+            grid.spacing = new Vector2(gridSpacing.x, 0f);
+            prefabText.lineSpacing = Mathf.Min(prefabLineSpacing, 0.9f);
+            Plugin.Log.LogInfo("Info popup grid cell -> " + grid.cellSize);
+        }
+
+        internal static void Restore()
+        {
+            if (grid != null)
             {
-                return; // lines size themselves; spacing tweaks above are all we can safely do
+                grid.cellSize = gridCell;
+                grid.spacing = gridSpacing;
             }
-            float target = Mathf.Ceil(text.fontSize * LineHeightPerFontPx);
-            var rt = (RectTransform)prefab;
-            if (rt.sizeDelta.y > target)
+            if (prefabText != null)
             {
-                rt.sizeDelta = new Vector2(rt.sizeDelta.x, target);
+                prefabText.lineSpacing = prefabLineSpacing;
             }
-            LayoutElement le = prefab.GetComponent<LayoutElement>();
-            if (le != null)
-            {
-                if (le.preferredHeight > target)
-                {
-                    le.preferredHeight = target;
-                }
-                if (le.minHeight > target)
-                {
-                    le.minHeight = target;
-                }
-            }
-            Plugin.Log.LogInfo("Info popup compacted: line height -> " + target + " (font " + text.fontSize + ")");
+            grid = null;
+            prefabText = null;
+            compacted = false;
         }
 
         private static void FixArmorLines(UICombat ui)
