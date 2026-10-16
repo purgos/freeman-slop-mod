@@ -64,11 +64,14 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
     Free and two-click Clear Bag controls in the trade screen's top bar; Deal works for free trades.
 - **Campaign backgrounds** (`DevCampaigns.cs`): the dev menu exports the current game as a new start background in
   the normal character creation (random world, character creator and faction name/flag as usual). It carries the
-  whole party (soldier types + companions, no levels/stats), everyone's exact loadout (every equipment slot), your
-  bag, every city you own, your money and faction funds, your relation/status/agreements with every faction and all
-  faction-vs-faction wars. Each export is a **campaign pack** - a small mod depending on this one - in
+  whole party (soldier types + companions) with levels, XP and all stats, in the same squads (names, icons,
+  formations, slot positions), everyone's exact loadout (every equipment slot), your bag, every city you own, your
+  money and faction funds, your relation/status/agreements with every faction and all faction-vs-faction wars. Each export is a **campaign pack** - a small mod depending on this one - in
   `BepInEx/FreemanSlop_Mods/<name>/` (`manifest.json` with the required mod version + `campaign.json`); copy the
   folder to share it. Packs load whether or not dev mode is on. Re-exporting a name asks for a second click.
+- **Save extras** (`DevSaveData.cs`): the game's save drops some values (your max health, morale and extra equipment
+  slots; companions' Leadership, Intelligence, skills, unspent points, max health and most equipment slots), so every
+  save also writes `FreemanSlop.json` into its folder and loading that save restores them once the world is up.
 ## Ideas / TODO
 - Diplomacy "Give money / Ask money / Persuade" (`UIPolitical`) confirm does nothing — unimplemented in vanilla.
 

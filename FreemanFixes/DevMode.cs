@@ -82,6 +82,7 @@ namespace FreemanFixes
             DevModeToggle.Teardown();
             DevMenu.Teardown();
             DevCampaigns.Remove();
+            DevSaveData.Teardown();
             DevStore.Teardown();
             CheatButton.Restore();
         }

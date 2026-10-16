@@ -11,8 +11,9 @@ namespace FreemanFixes
     // Exported campaigns: from dev mode, turn the current game into a new start "background" in the normal
     // character-creation dialog (UICampaign.ShowPLayerPreSetDialog_1 lists every Table_PlayerPresets entry).
     // A new game with it is otherwise completely normal (random world, character creator, faction name/flag).
-    //  - Copied: the whole party as soldier types + companions (no levels or stats), everyone's exact loadout
-    //    (every equipment slot, yours included), your bag (items + size), every city you own (the game itself only hands out the first preset city in
+    //  - Copied: the whole party (soldier types + companions) with levels, XP and all stats, in the same squads (names,
+    //    icons, formations, slot positions), everyone's exact loadout (every equipment slot, yours included), your
+    //    bag (items + size), every city you own (the game itself only hands out the first preset city in
     //    MapAgent.Initiate, so the rest are given the same way once the world is up), your money (InitMoney), your
     //    faction's funds, your status/relation/trade/defense with every faction, and all faction-vs-faction wars.
     //  - Everything else comes from the background you started this game with (your gen.Id preset).
@@ -182,6 +183,7 @@ namespace FreemanFixes
                     c.Cities.Add(city.id);
                 }
             }
+            var troopIndex = new Dictionary<NPCGen, int>();
             foreach (NPCGen gen in DevActions.PartyUnits())
             {
                 Uniform u = Uniform.Of(gen);
@@ -194,8 +196,40 @@ namespace FreemanFixes
                 else
                 {
                     u.Id = gen.Id;
+                    troopIndex[gen] = c.Troops.Count;
                     c.Troops.Add(u);
                 }
+            }
+            foreach (Transform squadT in MapAgent.code._Army.squads.items)
+            {
+                Squad squad = squadT != null ? squadT.GetComponent<Squad>() : null;
+                if (squad == null || squad.OriginalUnits == null)
+                {
+                    continue;
+                }
+                var layout = new SquadLayout();
+                layout.Name = squad.rename;
+                layout.Icon = squad.Icon != null ? squad.Icon.name : string.Empty;
+                layout.Formation = squad.FormationIndex;
+                foreach (Transform unit in squad.OriginalUnits)
+                {
+                    NPCGen gen = unit != null && unit.tag != "D" ? unit.GetComponent<NPCGen>() : null;
+                    HeroAgent hero = gen != null ? gen.GetComponent<HeroAgent>() : null;
+                    int ti;
+                    if (hero != null)
+                    {
+                        layout.Slots.Add("H" + hero.HeroId);
+                    }
+                    else if (gen != null && troopIndex.TryGetValue(gen, out ti))
+                    {
+                        layout.Slots.Add("T" + ti);
+                    }
+                    else
+                    {
+                        layout.Slots.Add(string.Empty);
+                    }
+                }
+                c.Squads.Add(layout);
             }
             foreach (Transform t in Global.code.factions.items)
             {
@@ -389,6 +423,7 @@ namespace FreemanFixes
             NPCGen me = MapAgent.code.gen;
             if (c.Player != null)
             {
+                c.Player.ApplyLevelAndStats(me);
                 c.Player.ApplyTo(me);
             }
             if (c.Bag != null && c.Bag.Count > 0)
@@ -409,38 +444,50 @@ namespace FreemanFixes
                 }
                 bag.items = items; // replaces the background's starting items
             }
-            var troopsByType = new Dictionary<int, Queue<Uniform>>();
-            foreach (Uniform u in c.Troops)
-            {
-                if (!troopsByType.ContainsKey(u.Id))
-                {
-                    troopsByType[u.Id] = new Queue<Uniform>();
-                }
-                troopsByType[u.Id].Enqueue(u);
-            }
+            // Match each exported person to a live unit: companions by HeroId, troops by type in export order.
+            var heroes = new Dictionary<int, NPCGen>();
+            var liveByType = new Dictionary<int, Queue<NPCGen>>();
             foreach (NPCGen gen in DevActions.PartyUnits())
             {
                 HeroAgent hero = gen.GetComponent<HeroAgent>();
                 if (hero != null)
                 {
-                    foreach (Uniform u in c.Companions)
-                    {
-                        if (u.Id == hero.HeroId)
-                        {
-                            u.ApplyTo(gen);
-                        }
-                    }
+                    heroes[hero.HeroId] = gen;
                 }
                 else
                 {
-                    Queue<Uniform> q;
-                    if (troopsByType.TryGetValue(gen.Id, out q) && q.Count > 0)
+                    if (!liveByType.ContainsKey(gen.Id))
                     {
-                        q.Dequeue().ApplyTo(gen);
+                        liveByType[gen.Id] = new Queue<NPCGen>();
                     }
+                    liveByType[gen.Id].Enqueue(gen);
                 }
             }
-            Plugin.Log.LogInfo("Campaign \"" + c.Name + "\": loadouts, bag and faction funds applied");
+            var troops = new NPCGen[c.Troops.Count];
+            for (int i = 0; i < c.Troops.Count; i++)
+            {
+                Queue<NPCGen> q;
+                if (liveByType.TryGetValue(c.Troops[i].Id, out q) && q.Count > 0)
+                {
+                    troops[i] = q.Dequeue();
+                    c.Troops[i].ApplyLevelAndStats(troops[i]);
+                    c.Troops[i].ApplyTo(troops[i]);
+                }
+            }
+            foreach (Uniform u in c.Companions)
+            {
+                NPCGen gen;
+                if (heroes.TryGetValue(u.Id, out gen))
+                {
+                    u.ApplyLevelAndStats(gen);
+                    u.ApplyTo(gen);
+                }
+            }
+            if (c.Squads.Count > 0)
+            {
+                RebuildSquads(c, heroes, troops);
+            }
+            Plugin.Log.LogInfo("Campaign \"" + c.Name + "\": levels, stats, loadouts, bag and faction funds applied");
             pending = c;
             if (runner == null)
             {
@@ -448,6 +495,90 @@ namespace FreemanFixes
                 UnityEngine.Object.DontDestroyOnLoad(runner);
                 runner.AddComponent<DevCampaignRunner>();
             }
+        }
+
+        // Replace the new game's default squads with the exported layout (names, icons, formations, slot positions),
+        // using the game's own steps: units go to the unassigned pool (like UIParty.Disband), then Army.NewSquad +
+        // Squad.AddUnit(gen, slot). Anyone not placed stays unassigned.
+        private static void RebuildSquads(DevCampaign c, Dictionary<int, NPCGen> heroes, NPCGen[] troops)
+        {
+            Army army = MapAgent.code._Army;
+            var old = new List<Squad>();
+            foreach (Transform t in army.squads.items)
+            {
+                Squad sq = t != null ? t.GetComponent<Squad>() : null;
+                if (sq != null)
+                {
+                    old.Add(sq);
+                }
+            }
+            foreach (Squad sq in old)
+            {
+                for (int i = sq.OriginalUnits.Length - 1; i >= 0; i--)
+                {
+                    Transform unit = sq.OriginalUnits[i];
+                    if (unit != null)
+                    {
+                        if (army.unassignedUnits.AddItemDifferentObject(unit))
+                        {
+                            unit.SetParent(army.transform);
+                        }
+                        sq.RemoveUnit(unit);
+                    }
+                }
+                army.squads.RemoveItem(sq.transform);
+                UnityEngine.Object.Destroy(sq.gameObject);
+            }
+            int placed = 0;
+            foreach (SquadLayout layout in c.Squads)
+            {
+                Squad sq = army.NewSquad();
+                if (!string.IsNullOrEmpty(layout.Name))
+                {
+                    sq.rename = layout.Name;
+                }
+                Texture2D icon;
+                if (!string.IsNullOrEmpty(layout.Icon) && RM.code.SquadIconData.TryGetValue(layout.Icon, out icon))
+                {
+                    sq.Icon = icon;
+                }
+                sq.FormationIndex = layout.Formation;
+                if (layout.Slots.Count > sq.OriginalUnits.Length)
+                {
+                    sq.OriginalUnits = new Transform[layout.Slots.Count];
+                }
+                for (int slot = 0; slot < layout.Slots.Count; slot++)
+                {
+                    NPCGen gen = Resolve(layout.Slots[slot], heroes, troops);
+                    if (gen == null)
+                    {
+                        continue;
+                    }
+                    army.unassignedUnits.RemoveItem(gen.transform);
+                    sq.AddUnit(gen, slot);
+                    placed++;
+                }
+            }
+            Plugin.Log.LogInfo("Campaign \"" + c.Name + "\": " + c.Squads.Count + " squads rebuilt, " + placed + " units placed");
+        }
+
+        private static NPCGen Resolve(string slot, Dictionary<int, NPCGen> heroes, NPCGen[] troops)
+        {
+            if (string.IsNullOrEmpty(slot) || slot.Length < 2)
+            {
+                return null;
+            }
+            int n;
+            if (!int.TryParse(slot.Substring(1), out n))
+            {
+                return null;
+            }
+            if (slot[0] == 'H')
+            {
+                NPCGen gen;
+                return heroes.TryGetValue(n, out gen) ? gen : null;
+            }
+            return slot[0] == 'T' && n >= 0 && n < troops.Length ? troops[n] : null;
         }
 
         // Once the new world is up: the extra cities and the political map.
@@ -534,6 +665,16 @@ namespace FreemanFixes
         public List<Uniform> Troops = new List<Uniform>();     // Id = soldier type (Soldier table)
         public List<Uniform> Companions = new List<Uniform>(); // Id = HeroId (Hero table)
         public List<FactionState> Factions = new List<FactionState>();
+        public List<SquadLayout> Squads = new List<SquadLayout>();
+    }
+
+    // One squad: name, icon, formation, and per slot "H<heroId>", "T<index into Troops>" or "" (empty).
+    public class SquadLayout
+    {
+        public string Name;
+        public string Icon;
+        public int Formation;
+        public List<string> Slots = new List<string>();
     }
 
     public class FactionState
@@ -606,10 +747,27 @@ namespace FreemanFixes
 
         public int Id;
         public Dictionary<string, int> Equipment = new Dictionary<string, int>();
+        public int Level;
+        public int Exp;
+        public float MaxHealth;
+        public Dictionary<int, int> Stats = new Dictionary<int, int>(); // DevStats ids, Level excluded
 
         internal static Uniform Of(NPCGen g)
         {
             var u = new Uniform();
+            u.Level = g.Level;
+            u.Exp = g.curExp;
+            u.MaxHealth = g.maxHealth;
+            HeroAgent hero = g.GetComponent<HeroAgent>();
+            AddStats(u.Stats, g, hero, DevStats.VitalsAndAttributes);
+            AddStats(u.Stats, g, hero, DevStats.Skills);
+            AddStats(u.Stats, g, hero, DevStats.Weapons);
+            if (hero != null)
+            {
+                AddStats(u.Stats, g, hero, DevStats.CompanionStats);
+            }
+            u.Stats.Remove(DevStats.Level);
+            u.Stats.Remove(DevStats.MaxHealth);
             foreach (string slot in Slots)
             {
                 var f = typeof(NPCGen).GetField(slot);
@@ -619,6 +777,48 @@ namespace FreemanFixes
                 }
             }
             return u;
+        }
+
+        private static void AddStats(Dictionary<int, int> stats, NPCGen g, HeroAgent h, int[] ids)
+        {
+            foreach (int id in ids)
+            {
+                stats[id] = DevStats.Get(g, h, id);
+            }
+        }
+
+        // Level, XP and every stat, exactly. Companions/soldiers get the level through NPCGen.SetLevel first (it
+        // recomputes their table-based stats), then the saved values overwrite those. The player gets the level set
+        // directly (SetLevel's player branch would hand out level-up points on top of the saved ones).
+        internal void ApplyLevelAndStats(NPCGen g)
+        {
+            if (Level <= 0)
+            {
+                return; // exported before levels/stats were included
+            }
+            HeroAgent hero = g.GetComponent<HeroAgent>();
+            if (g.GetComponent<MapAgent>() != null)
+            {
+                g.Level = Level;
+                g.nextExp = Level * 200 + Level * Level * 600; // NPCGen.SetLevel's formula
+            }
+            else
+            {
+                g.SetLevel(Level);
+            }
+            g.curExp = Exp;
+            if (Stats != null)
+            {
+                foreach (KeyValuePair<int, int> kv in Stats)
+                {
+                    DevStats.Set(g, hero, kv.Key, kv.Value);
+                }
+            }
+            if (MaxHealth > 0f)
+            {
+                g.maxHealth = MaxHealth;
+                g.curHealth = MaxHealth;
+            }
         }
 
         internal int Get(string slot)
