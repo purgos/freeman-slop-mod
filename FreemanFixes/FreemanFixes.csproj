@@ -7,6 +7,8 @@
     <AssemblyName>FreemanFixes</AssemblyName>
     <!-- C# 10: 11+ emits <>O delegate caches the game's old Mono can't load -->
     <LangVersion>10</LangVersion>
+    <!-- ScriptEngine reads symbols when loading and fails without them; embed so one DLL is enough -->
+    <DebugType>embedded</DebugType>
     <Nullable>disable</Nullable>
     <GenerateDocumentationFile>false</GenerateDocumentationFile>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>

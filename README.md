@@ -12,7 +12,8 @@ Requires owning the game; this repo never contains game files (`decompiled/` is 
      `ScriptEngine.dll` into `plugins/` and enables `LoadOnStart` + `EnableFileSystemWatcher`, so re-running
      `./install.sh` reloads the mod in the running game (F6 also reloads). Only patcher changes need a restart.
    - **Release:** `./install.sh --release` puts the plugin in `BepInEx/plugins/` (no ScriptEngine needed).
-4. Log: `<game>/BepInEx/LogOutput.log` (look for "Freeman Slop Mod loaded").
+   - Under Proton, ScriptEngine's file watcher may not notice changes; press **F6** in game after `./install.sh`.
+4. Log (written out late under Proton, often only when the game exits; judge live changes in game): `<game>/BepInEx/LogOutput.log` (look for "Freeman Slop Mod loaded").
 
 Uninstall: delete `winhttp.dll`, `doorstop_config.ini`, `.doorstop_version`, `BepInEx/` from the game folder.
 
