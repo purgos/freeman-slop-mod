@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net46</TargetFramework>
+    <NoStdLib>true</NoStdLib>
+    <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
+    <AssemblyName>FreemanFixes.Patcher</AssemblyName>
+    <!-- C# 10: 11+ emits <>O delegate caches the game's old Mono can't load -->
+    <LangVersion>10</LangVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <GameDir>$(HOME)/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/Freeman Guerrilla Warfare/Freeman Guerrilla Warfare</GameDir>
+    <Managed>$(GameDir)/Freeman Guerrilla Warfare_Data/Managed</Managed>
+    <BepCore>$(MSBuildThisFileDirectory)../vendor/bepinex/BepInEx/core</BepCore>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies.net46" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="mscorlib"><HintPath>$(Managed)/mscorlib.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System"><HintPath>$(Managed)/System.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="System.Core"><HintPath>$(Managed)/System.Core.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="BepInEx"><HintPath>$(BepCore)/BepInEx.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Mono.Cecil"><HintPath>$(BepCore)/Mono.Cecil.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+
+</Project>
