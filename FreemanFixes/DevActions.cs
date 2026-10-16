@@ -18,6 +18,8 @@ namespace FreemanFixes
             Done("Reputation set to " + value);
         }
 
+        // Same unit list the game's own Squad.AddMorale/GetMorale use (OriginalUnits); Squad.units can be null
+        // outside battle.
         internal static void SetMorale(int value)
         {
             value = Mathf.Clamp(value, 0, 100);
@@ -25,11 +27,11 @@ namespace FreemanFixes
             foreach (Transform squadT in MapAgent.code._Army.squads.items)
             {
                 Squad squad = squadT != null ? squadT.GetComponent<Squad>() : null;
-                if (squad == null)
+                if (squad == null || squad.OriginalUnits == null)
                 {
                     continue;
                 }
-                foreach (Transform unit in squad.units.items)
+                foreach (Transform unit in squad.OriginalUnits)
                 {
                     NPCGen gen = unit != null ? unit.GetComponent<NPCGen>() : null;
                     if (gen != null)

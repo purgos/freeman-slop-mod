@@ -2,12 +2,16 @@ using System;
 using System.IO;
 using BepInEx;
 using BepInEx.Logging;
+using Application = UnityEngine.Application;
+using LogType = UnityEngine.LogType;
 
 namespace FreemanFixes
 {
     // BepInEx's LogOutput.log (and Unity's output_log.txt) are buffered and, under Proton, often only land on disk
     // when the game exits. This listener writes every log event to BepInEx/LiveLog.txt with AutoFlush, so it can be
-    // tailed while the game runs. Unity's own log is included at Error only (the game floods Warning/Info: NavMesh, missing scripts).
+    // tailed while the game runs. Unity's own log is taken straight from Application.logMessageReceived at Error /
+    // Exception level only (the game floods Warning/Info: NavMesh, missing scripts), with the stack trace that
+    // BepInEx's Unity log source drops.
     internal class LiveLog : ILogListener
     {
         private const string FileName = "LiveLog.txt";
@@ -34,6 +38,7 @@ namespace FreemanFixes
                 writer.AutoFlush = true;
                 var live = new LiveLog(writer);
                 Logger.Listeners.Add(live);
+                Application.logMessageReceived += live.OnUnityLog;
                 return live;
             }
             catch (Exception e)
@@ -47,9 +52,9 @@ namespace FreemanFixes
         {
             var source = sender as ILogSource;
             string sourceName = source != null ? source.SourceName : "?";
-            if (sourceName == "Unity Log" && (e.Level & (LogLevel.Error | LogLevel.Fatal)) == 0)
+            if (sourceName == "Unity Log")
             {
-                return;
+                return; // written by OnUnityLog, with stack traces
             }
             try
             {
@@ -61,8 +66,28 @@ namespace FreemanFixes
             }
         }
 
+        private void OnUnityLog(string message, string stackTrace, LogType type)
+        {
+            if (type != LogType.Error && type != LogType.Exception && type != LogType.Assert)
+            {
+                return;
+            }
+            try
+            {
+                writer.WriteLine(DateTime.Now.ToString("HH:mm:ss") + " [" + type + ":Unity] " + message);
+                if (!string.IsNullOrEmpty(stackTrace))
+                {
+                    writer.WriteLine("    " + stackTrace.Trim().Replace("\n", "\n    "));
+                }
+            }
+            catch (Exception)
+            {
+            }
+        }
+
         public void Dispose()
         {
+            Application.logMessageReceived -= OnUnityLog;
             Logger.Listeners.Remove(this);
             try
             {

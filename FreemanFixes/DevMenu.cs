@@ -35,6 +35,7 @@ namespace FreemanFixes
         private const int ActAllNeutral = 17;
         private const int ActAllHostile = 19;
         private const int ActAllAllies = 20;
+        private const int ActMoralePreset = 22; // arg = morale value
 
         private static readonly Color HostileColor = new Color(0.95f, 0.2f, 0.15f);
         private static readonly Color UnfriendlyColor = new Color(0.93f, 0.55f, 0.13f);
@@ -214,6 +215,10 @@ namespace FreemanFixes
             StatRow(col, "Money", ActMoney);
             StatRow(col, "Reputation", ActReputation);
             StatRow(col, "Morale (all troops, 0-100)", ActMorale);
+            Transform moraleRow = Row(col);
+            MakeButton(moraleRow, "Morale 0", ActMoralePreset, 0).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            MakeButton(moraleRow, "Morale 50", ActMoralePreset, 50).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            MakeButton(moraleRow, "Morale 100", ActMoralePreset, 100).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             StatRow(col, "XP", ActXp);
             Spacer(col, 16f);
             Header(col, "Tools");
@@ -594,6 +599,10 @@ namespace FreemanFixes
                     return;
                 case ActAllNeutral:
                     DevActions.AllNeutral(factions);
+                    Refresh();
+                    return;
+                case ActMoralePreset:
+                    DevActions.SetMorale(arg);
                     Refresh();
                     return;
                 case ActAllHostile:
