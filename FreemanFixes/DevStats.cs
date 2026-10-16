@@ -8,6 +8,7 @@ namespace FreemanFixes
     // screen). Level uses the game's NPCGen.SetLevel so derived stats follow the game's rules.
     internal static class DevStats
     {
+        internal const int PlayerMaxLevel = 99;
         internal const int Level = 1;
         internal const int MaxHealth = 2;
         internal const int Morale = 3;
@@ -145,7 +146,7 @@ namespace FreemanFixes
             }
             if (stat == Level)
             {
-                return 100;
+                return PlayerMaxLevel; // companions are further clamped to Global.NPCGenMaxLevel by NPCGen.SetLevel
             }
             if (stat >= GovLeadership && stat <= GovGoverning)
             {
@@ -271,10 +272,20 @@ namespace FreemanFixes
             }
             if (v > g.Level)
             {
-                for (int i = 0; i < 200 && g.Level < v; i++)
+                // Grant the in-between levels' rewards like NPCGen.SetLevel's player branch does (attribute point
+                // each level, skill point every even level, 8 weapon points), then let SetLevel do the last level so
+                // health/hint come from the game - one "level up" message instead of dozens.
+                for (int lv = g.Level + 1; lv < v; lv++)
                 {
-                    g.SetLevel(g.Level + 1);
+                    g.Level = lv;
+                    g.attributePoints++;
+                    if (lv % 2 == 0)
+                    {
+                        g.playerPoints++;
+                    }
+                    g.weaponPoint += 8;
                 }
+                g.SetLevel(v);
             }
             else
             {
@@ -282,6 +293,31 @@ namespace FreemanFixes
                 g.nextExp = v * 200 + v * v * 600; // same formula as NPCGen.SetLevel
             }
             g.curExp = Mathf.Min(g.curExp, g.nextExp);
+        }
+
+        // After maxing a group there's nothing left to spend those points on, so zero that group's unspent pool:
+        // 0 attributes -> attributePoints, 1 skills -> playerPoints, 2 weapons -> weaponPoint, 3 companion (governor)
+        // stats -> HeroAgent PointValue - ConsumedPoint (HeroAgent.GetPointNum).
+        internal static void ClearUnspent(NPCGen g, HeroAgent h, int group)
+        {
+            switch (group)
+            {
+                case 0:
+                    g.attributePoints = 0;
+                    break;
+                case 1:
+                    g.playerPoints = 0;
+                    break;
+                case 2:
+                    g.weaponPoint = 0;
+                    break;
+                case 3:
+                    if (h != null)
+                    {
+                        h.ConsumedPoint = h.PointValue;
+                    }
+                    break;
+            }
         }
 
         // NPCGen.Name is the object name ("MapAgent") for the player; the character screen shows gen.rename.
@@ -292,6 +328,11 @@ namespace FreemanFixes
                 return g.rename;
             }
             return g.Name;
+        }
+
+        internal static int MaxLevelFor(NPCGen g)
+        {
+            return g.GetComponent<MapAgent>() != null ? PlayerMaxLevel : Global.NPCGenMaxLevel;
         }
 
         internal static bool InParty(HeroAgent h)

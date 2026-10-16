@@ -10,7 +10,7 @@ namespace FreemanFixes
     // from a trader removes it and compacts the list, InventorySlot.Select), keeping anything you sold to it so
     // Revert still works. The merchant grid is a fixed 250 slots (Inventory.Initiate), so stock is split into category
     // pages of up to 200 items, leaving room to sell. Page and Free controls are clones of the screen's Deal button in
-    // the free right half of its top bar. Free zeroes Item.GetBuyCost.
+    // the empty left part of its top bar. Free zeroes Item.GetBuyCost.
     internal class DevStore : MonoBehaviour
     {
         private const int ItemsPerPage = 200; // of the 250 merchant slots; the rest takes items you sell
@@ -29,6 +29,10 @@ namespace FreemanFixes
         private static GameObject controlsRow;
         private static Text pageLabel;
         private static Text freeLabel;
+        private static Text clearLabel;
+        private const string ClearText = "Clear Bag";
+        private const float ClearConfirmSeconds = 3f;
+        private float clearArmedUntil;
 
         internal static void Open()
         {
@@ -53,7 +57,7 @@ namespace FreemanFixes
             {
                 return;
             }
-            var go = new GameObject("FreemanSlop_DevStore");
+            var go = new GameObject("Dev Store"); // the trade screen shows the merchant object's name as its title
             DontDestroyOnLoad(go);
             Storage s = go.AddComponent<Storage>();
             s.items = new List<int>();
@@ -79,6 +83,7 @@ namespace FreemanFixes
             {
                 UICombat.code.AddPrompt(message);
             }
+            DevMenu.ShowStatus(message, true);
         }
 
         internal static void Teardown()
@@ -103,6 +108,12 @@ namespace FreemanFixes
         {
             return Instance != null && UITrading.code != null && UITrading.code.gameObject.activeInHierarchy
                 && UITrading.code.isTrading && UITrading.code.merchantInventory.storage == Instance.storage;
+        }
+
+        internal static bool HasPendingTrade()
+        {
+            return IsOpen() && (UITrading.code.playerInventory.storage.tempItems.Count > 0
+                || UITrading.code.merchantInventory.storage.tempItems.Count > 0);
         }
 
         internal static bool IsFreeNow()
@@ -301,6 +312,65 @@ namespace FreemanFixes
             Fill();
         }
 
+        // Two clicks within a few seconds: empties your bag (not what you're wearing). Cancels any pending trade first
+        // so the game's temp-item bookkeeping doesn't hand anything back afterwards.
+        internal void ClearBag()
+        {
+            if (Time.unscaledTime > clearArmedUntil)
+            {
+                clearArmedUntil = Time.unscaledTime + ClearConfirmSeconds;
+                if (clearLabel != null)
+                {
+                    clearLabel.text = "Click again";
+                }
+                return;
+            }
+            clearArmedUntil = 0f;
+            if (clearLabel != null)
+            {
+                clearLabel.text = ClearText;
+            }
+            if (IsOpen())
+            {
+                UITrading.code.Revert();
+            }
+            Storage bag = MapAgent.code.GetComponent<Storage>();
+            int removed = 0;
+            for (int i = 0; i < bag.items.Count; i++)
+            {
+                if (bag.items[i] != 0)
+                {
+                    bag.items[i] = 0;
+                    removed++;
+                }
+            }
+            bag.tempItems.Clear();
+            if (bag.inventory != null)
+            {
+                bag.inventory.Refresh();
+            }
+            if (UIInventory.code != null && UIInventory.code.playerInventory != null)
+            {
+                UIInventory.code.playerInventory.Refresh();
+            }
+            Fill();
+            MapAgent.code._Army.GetMapSpeed(isRefresh: true);
+            DevActions.Report("Cleared " + removed + " items from your bag");
+        }
+
+        private void Update()
+        {
+            // Disarm the Clear Bag confirmation if the second click doesn't come.
+            if (clearArmedUntil > 0f && Time.unscaledTime > clearArmedUntil)
+            {
+                clearArmedUntil = 0f;
+                if (clearLabel != null)
+                {
+                    clearLabel.text = ClearText;
+                }
+            }
+        }
+
         internal void ToggleFree()
         {
             DevMode.StoreFree.Value = !DevMode.StoreFree.Value;
@@ -345,9 +415,10 @@ namespace FreemanFixes
             rt.anchorMin = new Vector2(0.5f, 0.5f);
             rt.anchorMax = new Vector2(0.5f, 0.5f);
             rt.pivot = new Vector2(0.5f, 0.5f);
-            rt.anchoredPosition = new Vector2(320f, -4f);
+            // Left part of the bar is empty while trading; the auto-sort toggle and sort arrows sit on the right.
+            rt.anchoredPosition = new Vector2(-300f, -4f);
             var dealRt = (RectTransform)deal.transform;
-            rt.sizeDelta = new Vector2(600f, dealRt.rect.height);
+            rt.sizeDelta = new Vector2(650f, dealRt.rect.height);
             var row = controlsRow.AddComponent<HorizontalLayoutGroup>();
             row.spacing = 6f;
             row.childAlignment = TextAnchor.MiddleCenter;
@@ -357,9 +428,10 @@ namespace FreemanFixes
             row.childForceExpandHeight = true;
 
             AddControl(deal, "<", StoreButton.Prev, 50f);
-            pageLabel = AddControl(deal, "", StoreButton.Category, 250f);
+            pageLabel = AddControl(deal, "", StoreButton.Category, 220f);
             AddControl(deal, ">", StoreButton.Next, 50f);
             freeLabel = AddControl(deal, "", StoreButton.Free, 150f);
+            clearLabel = AddControl(deal, ClearText, StoreButton.ClearBag, 150f);
         }
 
         private static Text AddControl(Button template, string label, int kind, float width)
@@ -369,6 +441,7 @@ namespace FreemanFixes
             go.SetActive(true);
             Button b = go.GetComponent<Button>();
             b.onClick = new Button.ButtonClickedEvent();
+            b.interactable = true; // Deal is disabled while no trade is pending, and clones copy that state
             Text t = go.GetComponentInChildren<Text>(true);
             foreach (Component c in t.GetComponents<Component>())
             {
@@ -393,6 +466,7 @@ namespace FreemanFixes
         internal const int Next = 2;
         internal const int Category = 3;
         internal const int Free = 4;
+        internal const int ClearBag = 5;
 
         public int Kind;
 
@@ -416,6 +490,9 @@ namespace FreemanFixes
                     break;
                 case Free:
                     store.ToggleFree();
+                    break;
+                case ClearBag:
+                    store.ClearBag();
                     break;
             }
         }

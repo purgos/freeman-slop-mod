@@ -16,9 +16,9 @@ dotnet build FreemanFixes.Patcher/FreemanFixes.Patcher.csproj -c Release --nolog
 
 # Guard: the game's old Mono (CLR 2.0) can't run these; the compiler emits them silently.
 for dll in FreemanFixes/bin/Release/FreemanFixes.dll FreemanFixes.Patcher/bin/Release/FreemanFixes.Patcher.dll; do
-  bad=$(ilspycmd -il "$dll" 2>/dev/null | grep -cE 'Array::Empty|<>O|System\.(Func|Action)' || true)
+  bad=$(ilspycmd -il "$dll" 2>/dev/null | grep -cE 'Array::Empty|<>O|System\.(Func|Action)|System\.Reflection\.[A-Za-z]+::op_(In)?[Ee]quality|System\.Type::op_(In)?[Ee]quality' || true)
   if [ "$bad" != "0" ]; then
-    echo "ERROR: $dll uses APIs the game's runtime lacks (Array.Empty / <>O / Func/Action): $bad hits" >&2
+    echo "ERROR: $dll uses APIs the game's runtime lacks (Array.Empty / <>O / Func/Action / reflection ==): $bad hits" >&2
     exit 1
   fi
 done

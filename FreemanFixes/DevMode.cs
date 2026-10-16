@@ -15,12 +15,17 @@ namespace FreemanFixes
     {
         internal static ConfigEntry<bool> Enabled;
         internal static ConfigEntry<bool> StoreFree;
+        internal static ConfigEntry<bool> ShowSettingsToggle;
 
         internal static void Bind(ConfigFile config)
         {
             Enabled = config.Bind("Dev Mode", "Enabled", false,
                 "Adds dev controls to the game's cheat panel (End key): set money/reputation/morale/XP, faction money " +
                 "and relations, add troops, and an endless item store.");
+            ShowSettingsToggle = config.Bind("Dev Mode", "ShowSettingsToggle", true,
+                "Show the Dev Mode toggle in the game's Settings > General. The dev menu's \"turn off dev mode and " +
+                "hide its setting\" button sets this to false; set it back to true here to get the toggle back.");
+            Enabled.SettingChanged += OnEnabledChanged;
             StoreFree = config.Bind("Dev Mode", "StoreFree", true,
                 "Items in the dev store cost nothing (also toggleable in the store).");
         }
@@ -34,11 +39,49 @@ namespace FreemanFixes
         internal static void AttachToExisting()
         {
             CheatButton.Relabel();
+            DevCampaigns.Inject(); // campaign packs work with or without dev mode
+            CheatGate.Attach(UICheat.code);
+            DevModeToggle.Sync(UISettings.code);
+        }
+
+        // Switching dev mode at runtime (Settings toggle, dev menu button, config edit + reload).
+        private static void OnEnabledChanged(object sender, System.EventArgs e)
+        {
+            if (On)
+            {
+                CheatButton.Relabel();
+            }
+            else
+            {
+                CheatButton.Restore();
+                DevMenu.Teardown();
+                if (UICheat.code != null)
+                {
+                    UICheat.code.gameObject.SetActive(false);
+                }
+            }
+            DevModeToggle.Refresh();
+            Plugin.Log.LogInfo("Dev mode " + (On ? "on" : "off"));
+        }
+
+        // Dev menu button: dev mode off and the Settings toggle hidden; only the config file brings it back.
+        internal static void DisableAndHide()
+        {
+            ShowSettingsToggle.Value = false;
+            Enabled.Value = false; // OnEnabledChanged does the rest
+            DevModeToggle.Sync(UISettings.code);
         }
 
         internal static void Teardown()
         {
+            if (Enabled != null)
+            {
+                Enabled.SettingChanged -= OnEnabledChanged;
+            }
+            CheatGate.Detach();
+            DevModeToggle.Teardown();
             DevMenu.Teardown();
+            DevCampaigns.Remove();
             DevStore.Teardown();
             CheatButton.Restore();
         }
@@ -117,6 +160,18 @@ namespace FreemanFixes
     [HarmonyPatch]
     internal static class DevModePatches
     {
+        [HarmonyPostfix, HarmonyPatch(typeof(UICheat), nameof(UICheat.Awake))]
+        private static void CheatAwake(UICheat __instance)
+        {
+            CheatGate.Attach(__instance);
+        }
+
+        [HarmonyPostfix, HarmonyPatch(typeof(UISettings), "OnEnable")]
+        private static void SettingsShown(UISettings __instance)
+        {
+            DevModeToggle.Sync(__instance);
+        }
+
         // The cheat buttons are created in UICheat.Start (InitGM); relabel once they exist.
         [HarmonyPostfix, HarmonyPatch(typeof(UICheat), "Start")]
         private static void CheatStarted()
@@ -150,6 +205,17 @@ namespace FreemanFixes
         private static void AfterSlotClick()
         {
             DevStore.RestockAfterClick();
+        }
+
+        // UITrading.Update only enables Deal when the balance is non-zero, so free dev-store purchases (balance 0)
+        // could never be confirmed - and closing the screen Reverts them. Enable it whenever a trade is pending.
+        [HarmonyPostfix, HarmonyPatch(typeof(UITrading), nameof(UITrading.Update))]
+        private static void AfterTradeUpdate(UITrading __instance)
+        {
+            if (__instance.btnDeal != null && DevStore.HasPendingTrade())
+            {
+                __instance.btnDeal.interactable = true;
+            }
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(UITrading), nameof(UITrading.Deal))]

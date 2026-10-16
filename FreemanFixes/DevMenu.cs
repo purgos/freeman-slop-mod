@@ -9,8 +9,8 @@ namespace FreemanFixes
     // Full-screen dev menu, opened from the cheat panel's "Dev Menu" button (vanilla "Add All Items", see DevMode).
     // Styled from the game's own pieces: the trade screen's backdrop, the character screen's panel background,
     // orange section headers, row text and RENAME-style buttons, so it reads as one of the game's screens.
-    // Tabs: General = Player (money, reputation, morale, XP), Tools (item store + free toggle), Troops (add any
-    // soldier type); Factions = relation + money per faction; Companions = see DevMenuCompanions.cs.
+    // Tabs: General = Player (money, reputation, morale, XP), Tools (item store + free toggle, campaign export),
+    // Troops (add any soldier type); Factions = DevMenuFactions.cs; Companions = DevMenuCompanions.cs.
     internal partial class DevMenu : MonoBehaviour
     {
         private const string RootName = "FreemanSlop_DevMenu";
@@ -19,7 +19,6 @@ namespace FreemanFixes
         private const float HeaderHeight = 28f;
         private const float TextSize = 21f;
         private const float PlayerColumnWidth = 560f;
-        private const float FactionColumnWidth = 1000f;
         private const float TroopColumnWidth = 640f;
 
         private const int ActMoney = 1;
@@ -36,12 +35,21 @@ namespace FreemanFixes
         private const int ActAllHostile = 19;
         private const int ActAllAllies = 20;
         private const int ActMoralePreset = 22; // arg = morale value
+        private const int ActHealAll = 24;
+        private const int ActExportCampaign = 25;
+        private const int ActDisableDevMode = 27;
 
         private static readonly Color HostileColor = new Color(0.95f, 0.2f, 0.15f);
         private static readonly Color UnfriendlyColor = new Color(0.93f, 0.55f, 0.13f);
         private static readonly Color FriendlyColor = new Color(0.35f, 0.85f, 0.35f);
 
         internal static DevMenu Instance;
+        private Text status;
+        private Text disableLabel;
+        private float disableArmedUntil;
+        private const string DisableText = "Turn off dev mode and hide its setting";
+        private Color buttonTextColor = Color.white;
+        private Global builtFor;
 
         // Templates (the game's own UI objects) that every element copies its look from.
         private RawImage tBackdrop;
@@ -58,6 +66,8 @@ namespace FreemanFixes
         private readonly List<Text> factionNames = new List<Text>();
         private readonly List<Transform> soldiers = new List<Transform>();
         private Text storeFreeLabel;
+        private Text campaignLabel;
+        private InputField campaignName;
 
         internal static void Toggle()
         {
@@ -78,6 +88,12 @@ namespace FreemanFixes
                 DevStore.Prompt("Load a game first");
                 return;
             }
+            // The menu outlives scene loads, but its faction/companion/soldier lists belong to one world: rebuild it
+            // for a new game or loaded save (stale references are destroyed objects -> NullReferenceException).
+            if (Instance != null && (Instance.builtFor != Global.code || Instance.HasStaleFactions()))
+            {
+                Teardown();
+            }
             if (Instance == null && !Build())
             {
                 return;
@@ -88,6 +104,18 @@ namespace FreemanFixes
             }
             Instance.gameObject.SetActive(true);
             Instance.Refresh();
+        }
+
+        private bool HasStaleFactions()
+        {
+            foreach (Faction f in factions)
+            {
+                if (f == null) // Unity's == null is true for destroyed objects
+                {
+                    return true;
+                }
+            }
+            return false;
         }
 
         internal static void Teardown()
@@ -110,6 +138,39 @@ namespace FreemanFixes
             {
                 Close();
             }
+            if (disableLabel != null)
+            {
+                bool armed = Time.unscaledTime <= disableArmedUntil;
+                string want = armed ? "Click again: dev mode off, Settings toggle hidden" : DisableText;
+                if (disableLabel.text != want)
+                {
+                    disableLabel.text = want;
+                    disableLabel.color = armed ? UnfriendlyColor : buttonTextColor;
+                }
+            }
+            // The export button doubles as the "replace?" confirmation; put its label back when that times out.
+            if (campaignLabel != null)
+            {
+                string armed = DevCampaigns.ArmedReplace;
+                string want = armed != null ? "Click again to replace \"" + armed + "\""
+                    : "Export campaign (" + DevCampaigns.Count + " exported)";
+                if (campaignLabel.text != want)
+                {
+                    campaignLabel.text = want;
+                    campaignLabel.color = armed != null ? UnfriendlyColor : buttonTextColor;
+                }
+            }
+        }
+
+        // The game's prompt/hint popups draw behind this full-screen menu, so messages are mirrored here.
+        internal static void ShowStatus(string message, bool warning)
+        {
+            if (Instance == null || !Instance.gameObject.activeSelf || Instance.status == null)
+            {
+                return;
+            }
+            Instance.status.text = message;
+            Instance.status.color = warning ? UnfriendlyColor : FriendlyColor;
         }
 
         // ---------------------------------------------------------------- building
@@ -126,6 +187,7 @@ namespace FreemanFixes
                 return false;
             }
             Instance = menu;
+            menu.builtFor = Global.code;
             menu.BuildCanvas();
             menu.BuildContent();
             return true;
@@ -195,6 +257,9 @@ namespace FreemanFixes
             Text title = CopyText(tTitle, root, "Title", "DEV MODE", 40f, TextAnchor.MiddleCenter);
             Place(title.rectTransform, new Vector2(0.5f, 1f), new Vector2(0f, -45f), new Vector2(600f, 60f));
 
+            status = CopyText(tRowText, root, "Status", "", TextSize + 1f, TextAnchor.MiddleCenter);
+            Place(status.rectTransform, new Vector2(0.5f, 0f), new Vector2(0f, 45f), new Vector2(1600f, 40f));
+
             Button close = MakeButton(root, "Close", ActClose, 0);
             Place((RectTransform)close.transform, new Vector2(1f, 1f), new Vector2(-110f, -45f), new Vector2(140f, 36f));
 
@@ -203,9 +268,7 @@ namespace FreemanFixes
             var colRt = (RectTransform)generalPage.transform;
             BuildPlayerColumn(Column(colRt, PlayerColumnWidth));
             BuildTroopColumn(Column(colRt, TroopColumnWidth));
-            factionsPage = Page(root, "FactionsPage");
-            BuildFactionColumn(Column((RectTransform)factionsPage.transform, FactionColumnWidth));
-            factionsPage.SetActive(false);
+            BuildFactionsPage(root);
             BuildCompanionsPage(root);
         }
 
@@ -219,6 +282,9 @@ namespace FreemanFixes
             MakeButton(moraleRow, "Morale 0", ActMoralePreset, 0).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             MakeButton(moraleRow, "Morale 50", ActMoralePreset, 50).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             MakeButton(moraleRow, "Morale 100", ActMoralePreset, 100).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            Transform healRow = Row(col);
+            MakeButton(healRow, "Heal All (you + every soldier)", ActHealAll, 0).gameObject
+                .AddComponent<LayoutElement>().flexibleWidth = 1f;
             StatRow(col, "XP", ActXp);
             Spacer(col, 16f);
             Header(col, "Tools");
@@ -229,55 +295,22 @@ namespace FreemanFixes
             Button free = MakeButton(freeRow, "", ActStoreFree, 0);
             free.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             storeFreeLabel = free.GetComponentInChildren<Text>(true);
-        }
-
-        private void BuildFactionColumn(Transform col)
-        {
-            Header(col, "Factions  (relation -100..100, money)");
-            Transform allRow = Row(col);
-            MakeButton(allRow, "Make All Hostile", ActAllHostile, 0).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            MakeButton(allRow, "Make All Neutral", ActAllNeutral, 0).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            MakeButton(allRow, "Make All Allies", ActAllAllies, 0).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
-            if (Global.code == null || Global.code.factions == null)
-            {
-                return;
-            }
-            foreach (Transform t in Global.code.factions.items)
-            {
-                Faction f = t != null ? t.GetComponent<Faction>() : null;
-                if (f == null)
-                {
-                    continue;
-                }
-                if (f.name == "Player")
-                {
-                    factions.Insert(0, f);
-                }
-                else
-                {
-                    factions.Add(f);
-                }
-            }
-            for (int i = 0; i < factions.Count; i++)
-            {
-                Transform row = Row(col);
-                Text name = Label(row, "", 0f, 1f);
-                factionNames.Add(name);
-                if (factions[i].name == "Player")
-                {
-                    Label(row, "", 150f, 0f); // no relation with yourself
-                    Label(row, "", 70f, 0f);
-                }
-                else
-                {
-                    values[Key(ActRelation, i)] = Label(row, "", 70f, 0f);
-                    inputs[Key(ActRelation, i)] = MakeInput(row, 80f);
-                    MakeButton(row, "Set", ActRelation, i).gameObject.AddComponent<LayoutElement>().preferredWidth = 70f;
-                }
-                values[Key(ActFactionMoney, i)] = Label(row, "", 150f, 0f);
-                inputs[Key(ActFactionMoney, i)] = MakeInput(row, 120f);
-                MakeButton(row, "Set", ActFactionMoney, i).gameObject.AddComponent<LayoutElement>().preferredWidth = 70f;
-            }
+            Spacer(col, 16f);
+            Header(col, "Export as new-game background");
+            Transform nameRow = Row(col);
+            Label(nameRow, "Background", 140f, 0f);
+            campaignName = MakeInput(nameRow, 0f, InputField.ContentType.Standard);
+            campaignName.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            Transform saveRow = Row(col);
+            Button save = MakeButton(saveRow, "", ActExportCampaign, 0);
+            save.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            campaignLabel = save.GetComponentInChildren<Text>(true);
+            buttonTextColor = campaignLabel.color;
+            Spacer(col, 16f);
+            Transform offRow = Row(col);
+            Button off = MakeButton(offRow, "", ActDisableDevMode, 0);
+            off.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            disableLabel = off.GetComponentInChildren<Text>(true);
         }
 
         private void BuildTroopColumn(Transform col)
@@ -372,7 +405,8 @@ namespace FreemanFixes
             return t;
         }
 
-        private InputField MakeInput(Transform row, float width)
+        private InputField MakeInput(Transform row, float width,
+            InputField.ContentType type = InputField.ContentType.IntegerNumber)
         {
             var go = new GameObject("Input", typeof(RectTransform));
             go.transform.SetParent(row, false);
@@ -390,8 +424,13 @@ namespace FreemanFixes
             field.targetGraphic = bg;
             field.textComponent = text;
             field.placeholder = ph;
-            field.contentType = InputField.ContentType.IntegerNumber;
-            field.characterLimit = 10;
+            field.contentType = type;
+            field.characterLimit = type == InputField.ContentType.IntegerNumber ? 10 : 80;
+            if (type != InputField.ContentType.IntegerNumber)
+            {
+                text.alignment = TextAnchor.MiddleLeft;
+                ph.alignment = TextAnchor.MiddleLeft;
+            }
             field.customCaretColor = true;
             field.caretColor = c;
             field.selectionColor = new Color(0.93f, 0.55f, 0.13f, 0.45f); // game's orange accent
@@ -405,6 +444,7 @@ namespace FreemanFixes
             go.SetActive(true);
             Button b = go.GetComponent<Button>();
             b.onClick = new Button.ButtonClickedEvent(); // drop RENAME's wiring
+            b.interactable = true; // never inherit the template's current enabled/disabled state
             Text t = go.GetComponentInChildren<Text>(true);
             if (t != null)
             {
@@ -534,18 +574,7 @@ namespace FreemanFixes
             SetValue(ActReputation, 0, MapAgent.code.reputation.ToString());
             SetValue(ActMorale, 0, Mathf.RoundToInt(MapAgent.code._Army.GetAverageMorale()).ToString());
             SetValue(ActXp, 0, MapAgent.code.gen.curExp + " (Lv " + MapAgent.code.gen.Level + ")");
-            for (int i = 0; i < factions.Count; i++)
-            {
-                Faction f = factions[i];
-                if (f == null)
-                {
-                    continue;
-                }
-                factionNames[i].text = f.Name;
-                factionNames[i].color = FactionColor(f);
-                SetValue(ActRelation, i, f.relationship.ToString());
-                SetValue(ActFactionMoney, i, "$ " + f.Money.ToString("N0"));
-            }
+            RefreshFactions();
             if (storeFreeLabel != null)
             {
                 storeFreeLabel.text = DevMode.StoreFree.Value ? "Store prices: FREE" : "Store prices: NORMAL";
@@ -584,7 +613,7 @@ namespace FreemanFixes
 
         internal void Do(int action, int arg)
         {
-            if (DoCompanions(action, arg))
+            if (DoCompanions(action, arg) || DoFactions(action, arg))
             {
                 return;
             }
@@ -597,20 +626,29 @@ namespace FreemanFixes
                     Close();
                     DevStore.Open();
                     return;
-                case ActAllNeutral:
-                    DevActions.AllNeutral(factions);
+                case ActDisableDevMode:
+                    if (Time.unscaledTime > disableArmedUntil)
+                    {
+                        disableArmedUntil = Time.unscaledTime + 5f;
+                        ShowStatus("Turns dev mode off and removes its Settings toggle; only the config file brings it " +
+                            "back ([Dev Mode] ShowSettingsToggle). Click again to confirm.", true);
+                        return;
+                    }
+                    DevMode.DisableAndHide(); // closes and removes this menu
+                    return;
+                case ActExportCampaign:
+                    if (DevCampaigns.Export(campaignName.text, string.Empty))
+                    {
+                        campaignName.text = string.Empty; // keep it if it only asked to confirm a replace
+                    }
+                    Refresh();
+                    return;
+                case ActHealAll:
+                    DevActions.HealAll();
                     Refresh();
                     return;
                 case ActMoralePreset:
                     DevActions.SetMorale(arg);
-                    Refresh();
-                    return;
-                case ActAllHostile:
-                    DevActions.AllHostile(factions);
-                    Refresh();
-                    return;
-                case ActAllAllies:
-                    DevActions.AllAllies(factions);
                     Refresh();
                     return;
                 case ActStoreFree:

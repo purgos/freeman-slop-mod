@@ -12,6 +12,7 @@ namespace FreemanFixes
         private const int ActTabCompanions = 12;
         private const int ActTabFactions = 16;
         private const int ActRecruitAll = 18;
+        private const int ActMaxLevel = 23;
         private const int ActMaxGroup = 21; // arg: 0 attributes, 1 skills, 2 weapons, 3 companion stats
         private const int ActSelect = 13;
         private const int ActRecruit = 14;
@@ -169,6 +170,7 @@ namespace FreemanFixes
                     name.color = UnfriendlyColor; // the game's orange marks the one being edited
                 }
                 MakeButton(row, "Edit", ActSelect, i).gameObject.AddComponent<LayoutElement>().preferredWidth = 70f;
+                MakeButton(row, "Max Lv", ActMaxLevel, i).gameObject.AddComponent<LayoutElement>().preferredWidth = 80f;
                 if (DevStats.CanRecruit(h))
                 {
                     MakeButton(row, "Recruit", ActRecruit, i).gameObject.AddComponent<LayoutElement>().preferredWidth = 100f;
@@ -245,6 +247,16 @@ namespace FreemanFixes
                     }
                     Refresh();
                     return true;
+                case ActMaxLevel:
+                    if (arg < heroes.Count)
+                    {
+                        HeroAgent lh = heroes[arg];
+                        NPCGen lg = lh != null ? lh.gen : MapAgent.code.gen;
+                        DevStats.Set(lg, lh, DevStats.Level, DevStats.MaxLevelFor(lg));
+                        DevActions.Report(DevStats.DisplayName(lg) + ": level " + lg.Level);
+                    }
+                    Refresh();
+                    return true;
                 case ActMaxGroup:
                     HeroAgent mh = heroes[selected];
                     NPCGen mg = mh != null ? mh.gen : MapAgent.code.gen;
@@ -258,6 +270,7 @@ namespace FreemanFixes
                     {
                         DevStats.Set(mg, mh, stat, DevStats.Max(stat));
                     }
+                    DevStats.ClearUnspent(mg, mh, arg);
                     string what = arg == 1 ? "skills" : arg == 2 ? "weapon proficiencies"
                         : arg == 3 ? "companion stats" : "attributes";
                     DevActions.Report(DevStats.DisplayName(mg) + ": all " + what + " set to max");

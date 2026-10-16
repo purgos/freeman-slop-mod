@@ -8,7 +8,9 @@ Read `README.md` for setup, current fixes, and log locations. These rules are ho
   `Text` objects, then relabel and rewire them, so fonts, outlines, hover/press states and colors match the game.
   Never use IMGUI/`OnGUI` overlays or invented styling.
 - Accent color is the game's orange `new Color(0.93f, 0.55f, 0.13f)`; everything else comes from cloned elements.
-- When cloning a button, replace `onClick` with `new Button.ButtonClickedEvent()` to drop the original's scene wiring.
+- When cloning a button, replace `onClick` with `new Button.ButtonClickedEvent()` to drop the original's scene wiring,
+  and set `interactable = true`: a clone copies the template's *current* state (e.g. Deal is disabled while no trade
+  is pending), so it can come out dead.
 - Game code addresses children by index (`GetChild(0)`, `GetChild(1)`): **append** new children last, never insert.
 - **Leave the transfer panel's top bar alone**: don't put titles, labels or controls in it.
 - Layout is unknown until you see it: on a panel's first build, log its hierarchy with `DepositPanelUi.DumpHierarchy`
@@ -25,10 +27,15 @@ Breaking these compiles fine but fails in game, usually silently or as a white o
 - `LangVersion` stays ≤ 10. C# 11 method-group delegate caches (`<>O`) don't load.
 - No lambdas, LINQ delegates or `System.Func`/`System.Action`. For Unity events, use instance methods on small
   `MonoBehaviour`s with `new UnityAction(...)` / `new UnityAction<T>(...)`.
+- Don't compare `FieldInfo`/`MethodInfo`/`Type` with `==`/`!=` (those operators are .NET 4 only); cast to
+  `object` first.
 - `install.sh` refuses to install a DLL containing `Array::Empty`, `<>O`, or `System.Func`/`System.Action`.
   Never bypass that check.
 - Anything that must run before game code (working directory, config) goes in the preloader patcher
   (`FreemanFixes.Patcher`), not the plugin. The plugin chainloader starts after the first scene.
+
+- `TerrainControl.initiated` is only true in battle (`CheckCombat`); "world map ready" = `TerrainControl.code.isWorld`
+  plus a few seconds of settling.
 
 ## Code style
 - Match the surrounding code: 4-space indent, braces on their own lines, explicit types where the existing code uses them.

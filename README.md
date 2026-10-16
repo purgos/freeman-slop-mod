@@ -44,22 +44,31 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
 - **Popup placement** (`PopupPlacementPatches.cs`): the item info popup opens upward from the cursor, measured from
   what's actually drawn, and stays on screen below the top menu bar (vanilla mixed canvas units with screen pixels
   and ran off the bottom at high resolutions).
-- **Party screen layout** (`PartyLayoutPatches.cs`): the soldier info/loadout panel (`UICombat.unitInfoPanel`) is
-  lifted to just under the top menu bar while the party screen is open, so item popups fit; restored elsewhere.
-- **Dev mode** (`DevMode.cs`, `DevMenu*.cs`, `DevStats.cs`, `DevActions.cs`, `DevStore.cs`), off by default — enable
-  with `[Dev Mode] Enabled = true` in `BepInEx/config/purgos.freeman.fixes.cfg`. In the vanilla cheat panel (End key)
-  "Add All Items" becomes **Dev Menu** and the give-all / add-money / add-XP / Neutrality / Wood-Iron buttons are
-  hidden. The full-screen menu (built from the game's own panel, header, row and button styles) has tabs:
-  - **General:** set money, reputation, morale, XP; item store + free-prices toggle; add any soldier type (count).
-  - **Factions:** relation and money per faction; Make All Hostile / Neutral / Allies.
+- **Dev mode** (`DevMode.cs`, `DevModeToggle.cs`, `DevMenu*.cs`, `DevStats.cs`, `DevActions.cs`, `DevStore.cs`), off
+  by default. Toggle it in the game's **Settings > General > Dev Mode** (or `[Dev Mode] Enabled` in
+  `BepInEx/config/purgos.freeman.fixes.cfg`). Off = the whole End-key cheat panel is disabled, vanilla cheats too.
+  On = in the cheat panel "Add All Items" becomes **Dev Menu** and the give-all / add-money / add-XP / Neutrality /
+  Wood-Iron buttons are hidden. The full-screen menu (built from the game's own panel, header, row and button
+  styles; a status line at the bottom shows results, since the game's popups draw behind it) has tabs:
+  - **General:** set money, reputation, morale (+ 0/50/100), XP; Heal All; item store + free-prices toggle; export a
+    campaign background; add any soldier type (count); "turn off dev mode and hide its setting" (two clicks; sets
+    `[Dev Mode] ShowSettingsToggle = false`, set it back to `true` to restore the Settings toggle).
+  - **Factions:** per faction your relation, status (Hostile..Ally), trade and mutual-defense agreements, money, and
+    a Wars side column for war/peace between any two factions; Make All Hostile / Neutral / Allies.
   - **Companions:** you + every companion with status (in party / yours, away / prisoner / with a faction / free)
-    and Edit / Recruit / "Recruit All Companions" (skips anyone already yours, per `Faction.GetAllHero`); stat editor
-    for level, health, morale, unspent points, attributes, skills, weapon proficiency, affection and governor
-    stats (governor stats cap at 10), with Max All Attributes / Skills / Weapons / Companion Stats.
+    and Edit / Max Lv / Recruit / "Recruit All Companions" (skips anyone already yours, per `Faction.GetAllHero`);
+    stat editor for level, health, morale, unspent points, attributes, skills, weapon proficiency, affection and
+    governor stats (cap 10), with Max All Attributes / Skills / Weapons / Companion Stats (zeroing those points).
   - **Item store:** a trader with one of every item that never runs out (restocked after every click, keeping
-    anything you sold so Revert works), in category pages of up to 200 (the trade grid is a fixed 250 slots); page
-    controls in the trade screen's top bar, `StoreFree` config / in-store toggle.
-
+    anything you sold so Revert works), in category pages of up to 200 (the trade grid is a fixed 250 slots); page,
+    Free and two-click Clear Bag controls in the trade screen's top bar; Deal works for free trades.
+- **Campaign backgrounds** (`DevCampaigns.cs`): the dev menu exports the current game as a new start background in
+  the normal character creation (random world, character creator and faction name/flag as usual). It carries the
+  whole party (soldier types + companions, no levels/stats), everyone's exact loadout (every equipment slot), your
+  bag, every city you own, your money and faction funds, your relation/status/agreements with every faction and all
+  faction-vs-faction wars. Each export is a **campaign pack** - a small mod depending on this one - in
+  `BepInEx/FreemanSlop_Mods/<name>/` (`manifest.json` with the required mod version + `campaign.json`); copy the
+  folder to share it. Packs load whether or not dev mode is on. Re-exporting a name asks for a second click.
 ## Ideas / TODO
 - Diplomacy "Give money / Ask money / Persuade" (`UIPolitical`) confirm does nothing — unimplemented in vanilla.
 

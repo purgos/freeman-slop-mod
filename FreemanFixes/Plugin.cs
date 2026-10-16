@@ -5,9 +5,12 @@ using HarmonyLib;
 
 namespace FreemanFixes
 {
-    [BepInPlugin("purgos.freeman.fixes", "Freeman Slop Mod", "0.3.0")]
+    [BepInPlugin(Id, "Freeman Slop Mod", Version)]
     public class Plugin : BaseUnityPlugin
     {
+        internal const string Id = "purgos.freeman.fixes";
+        internal const string Version = "0.4.0";
+
         internal static ManualLogSource Log;
 
         private Harmony harmony;
@@ -37,7 +40,6 @@ namespace FreemanFixes
             }
             DepositPanelUi.TeardownCurrent();
             InfoPopupPatches.Restore();
-            PartyLayoutPatches.Restore();
             DevMode.Teardown();
             Logger.LogInfo("Freeman Slop Mod unloaded");
             if (liveLog != null)
