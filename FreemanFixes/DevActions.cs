@@ -95,6 +95,40 @@ namespace FreemanFixes
             Done(changed + " factions set to Neutral");
         }
 
+        // Every other faction Hostile at -50: SetRelationValue(Hostile) also declares war (adds you to their enemies).
+        internal static void AllHostile(System.Collections.Generic.List<Faction> factions)
+        {
+            int changed = 0;
+            foreach (Faction f in factions)
+            {
+                if (f == null || f.name == "Player")
+                {
+                    continue;
+                }
+                f.SetRelationValue(RelationValue.Hostile);
+                f.SetRelationship(-50);
+                changed++;
+            }
+            Done(changed + " factions set to Hostile");
+        }
+
+        // Every other faction Ally at 80 (SetRelationValue(Ally) drops them from your enemies).
+        internal static void AllAllies(System.Collections.Generic.List<Faction> factions)
+        {
+            int changed = 0;
+            foreach (Faction f in factions)
+            {
+                if (f == null || f.name == "Player")
+                {
+                    continue;
+                }
+                f.SetRelationValue(RelationValue.Ally);
+                f.SetRelationship(80);
+                changed++;
+            }
+            Done(changed + " factions set to Allies");
+        }
+
         internal static void SetFactionMoney(Faction f, int value)
         {
             if (f == null)

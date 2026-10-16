@@ -53,10 +53,17 @@ namespace FreemanFixes
             Constitution, Marksmanship, Agility, Leadership, Intelligence
         };
 
+        internal static readonly int[] Attributes = { Constitution, Marksmanship, Agility, Leadership, Intelligence };
+
         internal static readonly int[] Skills =
         {
             Commanding, PrisonerManagement, Training, InventoryManagement, Navigation, Looting, Medical, FirstAid,
             Trading, Persuasion, Stealing
+        };
+
+        internal static readonly int[] Weapons =
+        {
+            Armor, Pistol, Smg, Shotgun, Rifle, AssaultRifle, MachineGun, Launcher, Throwing
         };
 
         internal static readonly int[] WeaponsAndCompanion =
@@ -76,11 +83,11 @@ namespace FreemanFixes
             switch (stat)
             {
                 case Level: return "Level";
-                case MaxHealth: return "Health (max, heals)";
+                case MaxHealth: return "Health";
                 case Morale: return "Morale";
-                case AttributePoints: return "Unspent attribute pts";
-                case SkillPoints: return "Unspent skill pts";
-                case WeaponPoints: return "Unspent weapon pts";
+                case AttributePoints: return "Attribute pts";
+                case SkillPoints: return "Skill pts";
+                case WeaponPoints: return "Weapon pts";
                 case Constitution: return "Constitution";
                 case Marksmanship: return "Marksmanship";
                 case Agility: return "Agility";
@@ -197,7 +204,7 @@ namespace FreemanFixes
             switch (stat)
             {
                 case Level: SetLevel(g, v); return;
-                case MaxHealth: g.maxHealth = v; g.curHealth = v; return;
+                case MaxHealth: g.maxHealth = v; g.curHealth = v; return; // max health, fully healed
                 case Morale: g.morale = v; if (g.squad != null) { g.squad.GetMorale(); } return;
                 case AttributePoints: g.attributePoints = v; return;
                 case SkillPoints: g.playerPoints = v; return;
@@ -268,16 +275,85 @@ namespace FreemanFixes
             g.curExp = Mathf.Min(g.curExp, g.nextExp);
         }
 
+        // NPCGen.Name is the object name ("MapAgent") for the player; the character screen shows gen.rename.
+        internal static string DisplayName(NPCGen g)
+        {
+            if (g.GetComponent<MapAgent>() != null && !string.IsNullOrEmpty(g.rename))
+            {
+                return g.rename;
+            }
+            return g.Name;
+        }
+
         internal static bool InParty(HeroAgent h)
         {
             NPCGen g = h != null ? h.gen : null;
             return g != null && MapAgent.code != null && g._Army == MapAgent.code._Army;
         }
 
+        // The faction a companion serves (leading an army, governing a city, ...), per Faction.GetAllHero; null if free.
+        internal static Faction Owner(HeroAgent h)
+        {
+            if (h == null || Global.code == null)
+            {
+                return null;
+            }
+            foreach (Transform t in Global.code.factions.items)
+            {
+                Faction f = t != null ? t.GetComponent<Faction>() : null;
+                if (f != null && f.GetAllHero().Contains(h.transform))
+                {
+                    return f;
+                }
+            }
+            return null;
+        }
+
+        internal static bool IsPlayerFaction(Faction f)
+        {
+            return f != null && MapAgent.code != null && f == MapAgent.code._Army.faction;
+        }
+
+        internal static bool IsYourPrisoner(HeroAgent h)
+        {
+            return h != null && MapAgent.code != null && MapAgent.code._Army.prisoners.items.Contains(h.transform);
+        }
+
+        // Status shown in the dev menu's character list.
+        internal static string Status(HeroAgent h)
+        {
+            if (InParty(h))
+            {
+                return "in party";
+            }
+            if (IsYourPrisoner(h))
+            {
+                return "your prisoner";
+            }
+            Faction owner = Owner(h);
+            if (IsPlayerFaction(owner))
+            {
+                return "yours, away";
+            }
+            if (owner != null)
+            {
+                return "with " + owner.Name;
+            }
+            return h.tag == "D" ? "dead" : "not recruited";
+        }
+
+        // Recruitable unless already yours (party, away on your behalf, or your prisoner) or dead. Companions serving
+        // another faction can be poached, like vanilla "Add All Companions" does.
+        internal static bool CanRecruit(HeroAgent h)
+        {
+            return h != null && h.gen != null && h.tag != "D" && !InParty(h) && !IsYourPrisoner(h)
+                && !IsPlayerFaction(Owner(h));
+        }
+
         // Same steps as vanilla UICheat.AddAllHero, for one companion.
         internal static bool Recruit(HeroAgent h)
         {
-            if (h == null || InParty(h))
+            if (!CanRecruit(h))
             {
                 return false;
             }

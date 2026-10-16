@@ -33,6 +33,8 @@ namespace FreemanFixes
         private const int ActStoreFree = 9;
         private const int ActClose = 10;
         private const int ActAllNeutral = 17;
+        private const int ActAllHostile = 19;
+        private const int ActAllAllies = 20;
 
         private static readonly Color HostileColor = new Color(0.95f, 0.2f, 0.15f);
         private static readonly Color UnfriendlyColor = new Color(0.93f, 0.55f, 0.13f);
@@ -228,8 +230,9 @@ namespace FreemanFixes
         {
             Header(col, "Factions  (relation -100..100, money)");
             Transform allRow = Row(col);
-            MakeButton(allRow, "Make All Factions Neutral", ActAllNeutral, 0).gameObject
-                .AddComponent<LayoutElement>().flexibleWidth = 1f;
+            MakeButton(allRow, "Make All Hostile", ActAllHostile, 0).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            MakeButton(allRow, "Make All Neutral", ActAllNeutral, 0).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            MakeButton(allRow, "Make All Allies", ActAllAllies, 0).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             if (Global.code == null || Global.code.factions == null)
             {
                 return;
@@ -342,7 +345,9 @@ namespace FreemanFixes
         {
             var go = new GameObject("Row", typeof(RectTransform));
             go.transform.SetParent(parent, false);
-            go.AddComponent<LayoutElement>().preferredHeight = RowHeight;
+            var le = go.AddComponent<LayoutElement>();
+            le.preferredHeight = RowHeight;
+            le.flexibleHeight = 0f; // else the row inherits the cloned button's flexible height and stretches
             var h = go.AddComponent<HorizontalLayoutGroup>();
             h.spacing = 8f;
             h.childAlignment = TextAnchor.MiddleLeft;
@@ -589,6 +594,14 @@ namespace FreemanFixes
                     return;
                 case ActAllNeutral:
                     DevActions.AllNeutral(factions);
+                    Refresh();
+                    return;
+                case ActAllHostile:
+                    DevActions.AllHostile(factions);
+                    Refresh();
+                    return;
+                case ActAllAllies:
+                    DevActions.AllAllies(factions);
                     Refresh();
                     return;
                 case ActStoreFree:

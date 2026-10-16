@@ -51,9 +51,11 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   "Add All Items" becomes **Dev Menu** and the give-all / add-money / add-XP / Neutrality / Wood-Iron buttons are
   hidden. The full-screen menu (built from the game's own panel, header, row and button styles) has tabs:
   - **General:** set money, reputation, morale, XP; item store + free-prices toggle; add any soldier type (count).
-  - **Factions:** relation and money per faction; "Make All Factions Neutral".
-  - **Companions:** you + every companion with Edit / Recruit / "Recruit All Companions"; stat editor for level,
-    health, morale, unspent points, attributes, skills, weapon proficiency, affection and governor stats.
+  - **Factions:** relation and money per faction; Make All Hostile / Neutral / Allies.
+  - **Companions:** you + every companion with status (in party / yours, away / prisoner / with a faction / free)
+    and Edit / Recruit / "Recruit All Companions" (skips anyone already yours, per `Faction.GetAllHero`); stat editor
+    for level, health, morale, unspent points, attributes, skills, weapon proficiency, affection and governor
+    stats, with Max All Attributes / Skills / Weapons.
   - **Item store:** a trader with 7 of every item in category pages (the trade grid is a fixed 250 slots), page
     controls in the trade screen's top bar, restocks after each deal, `StoreFree` config / in-store toggle.
 

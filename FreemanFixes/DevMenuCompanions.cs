@@ -12,6 +12,7 @@ namespace FreemanFixes
         private const int ActTabCompanions = 12;
         private const int ActTabFactions = 16;
         private const int ActRecruitAll = 18;
+        private const int ActMaxGroup = 21; // arg: 0 attributes, 1 skills, 2 weapons
         private const int ActSelect = 13;
         private const int ActRecruit = 14;
         private const int ActStat = 15;
@@ -69,7 +70,7 @@ namespace FreemanFixes
             Header(list, "Characters  (Edit to change stats)");
             Transform allRow = Row(list);
             MakeButton(allRow, "Recruit All Companions", ActRecruitAll, 0).gameObject
-                .AddComponent<LayoutElement>().flexibleWidth = 1f;
+                .AddComponent<LayoutElement>().preferredWidth = 300f;
             companionList = ScrollArea(list);
 
             Transform c1 = Column(page, StatColumnWidth);
@@ -78,18 +79,26 @@ namespace FreemanFixes
             {
                 StatEditRow(c1, stat);
             }
+            Transform maxRow = Row(c1);
+            MakeButton(maxRow, "Max All Attributes", ActMaxGroup, 0).gameObject
+                .AddComponent<LayoutElement>().flexibleWidth = 1f;
             Transform c2 = Column(page, StatColumnWidth);
             Header(c2, "Skills");
             foreach (int stat in DevStats.Skills)
             {
                 StatEditRow(c2, stat);
             }
+            Transform maxSkills = Row(c2);
+            MakeButton(maxSkills, "Max All Skills", ActMaxGroup, 1).gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             Transform c3 = Column(page, StatColumnWidth);
             statsHeader = HeaderText(c3, "Weapons");
             foreach (int stat in DevStats.WeaponsAndCompanion)
             {
                 if (stat == DevStats.Affection)
                 {
+                    Transform maxWeapons = Row(c3);
+                    MakeButton(maxWeapons, "Max All Weapons", ActMaxGroup, 2).gameObject
+                        .AddComponent<LayoutElement>().flexibleWidth = 1f;
                     GameObject companionHeader = HeaderText(c3, "Companion").transform.parent.gameObject;
                     companionOnlyRows[-1] = companionHeader;
                 }
@@ -149,14 +158,14 @@ namespace FreemanFixes
                 HeroAgent h = heroes[i];
                 NPCGen g = h != null ? h.gen : MapAgent.code.gen;
                 Transform row = Row(companionList);
-                string status = h == null ? "you" : (DevStats.InParty(h) ? "in party" : "not recruited");
-                Text name = Label(row, g.Name + "  (Lv " + g.Level + ", " + status + ")", 0f, 1f);
+                string status = h == null ? "you" : DevStats.Status(h);
+                Text name = Label(row, DevStats.DisplayName(g) + "  (Lv " + g.Level + ", " + status + ")", 0f, 1f);
                 if (i == selected)
                 {
                     name.color = UnfriendlyColor; // the game's orange marks the one being edited
                 }
                 MakeButton(row, "Edit", ActSelect, i).gameObject.AddComponent<LayoutElement>().preferredWidth = 70f;
-                if (h != null && !DevStats.InParty(h))
+                if (DevStats.CanRecruit(h))
                 {
                     MakeButton(row, "Recruit", ActRecruit, i).gameObject.AddComponent<LayoutElement>().preferredWidth = 100f;
                 }
@@ -176,7 +185,7 @@ namespace FreemanFixes
             RebuildCompanionList();
             HeroAgent h = heroes[selected];
             NPCGen g = h != null ? h.gen : MapAgent.code.gen;
-            statsHeader.text = "Weapons  -  editing " + g.Name;
+            statsHeader.text = "Weapons  -  editing " + DevStats.DisplayName(g);
             foreach (KeyValuePair<int, GameObject> kv in companionOnlyRows)
             {
                 kv.Value.SetActive(h != null);
@@ -213,11 +222,15 @@ namespace FreemanFixes
                     int recruited = 0;
                     for (int i = 1; i < heroes.Count; i++)
                     {
-                        if (!DevStats.InParty(heroes[i]) && DevStats.Recruit(heroes[i]))
+                        if (!DevStats.CanRecruit(heroes[i]))
+                        {
+                            continue; // already yours (party, away, prisoner) or dead
+                        }
+                        if (DevStats.Recruit(heroes[i]))
                         {
                             recruited++;
                         }
-                        else if (!DevStats.InParty(heroes[i]) && (TerrainControl.code == null || !TerrainControl.code.isWorld))
+                        else if (TerrainControl.code == null || !TerrainControl.code.isWorld)
                         {
                             break; // Recruit already said "world map only"; don't repeat it per companion
                         }
@@ -226,6 +239,18 @@ namespace FreemanFixes
                     {
                         DevActions.Report("Recruited " + recruited + " companions");
                     }
+                    Refresh();
+                    return true;
+                case ActMaxGroup:
+                    HeroAgent mh = heroes[selected];
+                    NPCGen mg = mh != null ? mh.gen : MapAgent.code.gen;
+                    int[] group = arg == 1 ? DevStats.Skills : (arg == 2 ? DevStats.Weapons : DevStats.Attributes);
+                    foreach (int stat in group)
+                    {
+                        DevStats.Set(mg, mh, stat, DevStats.Max(stat));
+                    }
+                    string what = arg == 1 ? "skills" : (arg == 2 ? "weapon proficiencies" : "attributes");
+                    DevActions.Report(DevStats.DisplayName(mg) + ": all " + what + " set to max");
                     Refresh();
                     return true;
                 case ActSelect:
@@ -251,7 +276,7 @@ namespace FreemanFixes
                     HeroAgent h = heroes[selected];
                     NPCGen g = h != null ? h.gen : MapAgent.code.gen;
                     DevStats.Set(g, h, arg, value);
-                    DevActions.Report(g.Name + ": " + DevStats.Label(arg) + " set to " + DevStats.Get(g, h, arg));
+                    DevActions.Report(DevStats.DisplayName(g) + ": " + DevStats.Label(arg) + " set to " + DevStats.Get(g, h, arg));
                     field.text = string.Empty;
                     Refresh();
                     return true;
