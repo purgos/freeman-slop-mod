@@ -1,4 +1,6 @@
+using System.Text;
 using BepInEx.Configuration;
+using Ex;
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.Events;
@@ -6,14 +8,18 @@ using UnityEngine.UI;
 
 namespace FreemanFixes
 {
-    // Menu > "back to desktop" in a manual-save (ordinary) game: instead of the plain "return?" box, the game's own
-    // confirmation dialog offers Save & Exit / Exit / Cancel. Save & Exit runs the game's normal SaveGame, so it's a
-    // regular save (and DevSaveData writes its extras). Where the game can't save (battle, resting) it says so and
-    // offers Exit / Cancel. No prompt if nothing happened since the last save (world clock unchanged). Realistic
-    // games already save-and-exit in one step, so they keep the vanilla box.
-    internal class SaveOnExit
+    // Menu > "back to desktop" in a manual-save (ordinary) game: before the game's own "return to main menu?" box, a
+    // clone of that box asks "Save before exiting?" with Save / Don't Save. Save runs the game's normal SaveGame (so
+    // DevSaveData writes its extras too); either way the vanilla return box follows, so No there still cancels.
+    // Skipped when the game can't save (battle, resting), when nothing happened since the last save (world clock
+    // unchanged), and in realistic games, which already save-and-exit in one step.
+    internal class SaveOnExit : MonoBehaviour
     {
+        private const string Name = "FreemanSlop_SaveOnExitPrompt";
+
         internal static ConfigEntry<bool> Enabled;
+
+        private static GameObject prompt;
 
         private static string savedGame;
         private static int savedDay = -1;
@@ -50,101 +56,132 @@ namespace FreemanFixes
                 && !MapAgent.code.sleeping;
         }
 
-        // Returns true if it showed its own prompt (skip the vanilla one).
+        // Returns true if it showed its own prompt (skip the vanilla return box for now).
         internal static bool Prompt()
         {
             if (Enabled == null || !Enabled.Value || Mainframe.code == null || Global.code == null
-                || UIConfirmation.code == null || UIMenu.code == null
-                || Mainframe.code.CurGameType != GameType.ordinary)
+                || UIMenu.code == null || UIMenu.code.uiReturn == null
+                || Mainframe.code.CurGameType != GameType.ordinary || !CanSave() || SavedSinceLastChange())
             {
                 return false;
             }
-            var me = new SaveOnExit();
-            Raise();
-            if (!CanSave())
+            if (prompt == null && !Build())
             {
-                UIConfirmation.code.ShowConfirmation("You can't save right now. Exit to the main menu without saving?",
-                    true, new UnityAction(me.Exit), new UnityAction(me.Cancel), null,
-                    new string[] { "Exit", "Cancel" });
-                return true;
-            }
-            if (SavedSinceLastChange())
-            {
-                Lower();
                 return false;
             }
-            UIConfirmation.code.ShowConfirmation("Save the game before exiting to the main menu?",
-                true, new UnityAction(me.SaveAndExit), new UnityAction(me.Cancel), new UnityAction(me.Exit),
-                new string[] { "Save & Exit", "Cancel", "Exit" });
+            prompt.SetActive(true);
             return true;
         }
 
-        // The pause menu draws over the confirmation dialog, and hiding the menu would unpause the game (Global ties
-        // Time.timeScale to it). So while our prompt is up the dialog gets its own canvas sorted above the menu's.
-        private static Canvas raised;
-
-        private static void Raise()
+        internal static void Hide()
         {
-            GameObject dialog = UIConfirmation.code.gameObject;
-            if (raised != null || dialog.GetComponent<Canvas>() != null)
+            if (prompt != null)
             {
-                return;
+                prompt.SetActive(false);
             }
-            int top = 0;
-            foreach (Canvas c in UIMenu.code.GetComponentsInParent<Canvas>(true))
-            {
-                top = Mathf.Max(top, c.sortingOrder);
-            }
-            foreach (Canvas c in UIMenu.code.GetComponentsInChildren<Canvas>(true))
-            {
-                top = Mathf.Max(top, c.sortingOrder);
-            }
-            raised = dialog.AddComponent<Canvas>();
-            raised.overrideSorting = true;
-            raised.sortingOrder = top + 10;
-            dialog.AddComponent<GraphicRaycaster>();
         }
 
-        internal static void Lower()
+        internal static void Teardown()
         {
-            if (raised == null)
+            if (prompt != null)
             {
-                return;
+                Destroy(prompt);
             }
-            GraphicRaycaster r = raised.GetComponent<GraphicRaycaster>();
-            if (r != null)
+            prompt = null;
+        }
+
+        private static bool Build()
+        {
+            GameObject template = UIMenu.code.uiReturn;
+            Button[] templateButtons = template.GetComponentsInChildren<Button>(true);
+            Plugin.Log.LogInfo("Save on exit: return box layout:\n" + Describe(template.transform, ""));
+            if (templateButtons.Length < 2)
             {
-                Object.DestroyImmediate(r);
+                Plugin.Log.LogWarning("Save on exit: return box has " + templateButtons.Length + " buttons; using vanilla");
+                return false;
             }
-            Object.DestroyImmediate(raised);
-            raised = null;
-        }
-
-        private static void Close()
-        {
-            UIConfirmation.code.Close();
-            Lower();
-        }
-
-        public void SaveAndExit()
-        {
-            Close();
-            if (CanSave())
+            prompt = Instantiate(template, template.transform.parent, false);
+            prompt.name = Name;
+            prompt.transform.SetAsLastSibling();
+            foreach (LocalizationText loc in prompt.GetComponentsInChildren<LocalizationText>(true))
             {
-                Mainframe.code.SaveGame();
+                DestroyImmediate(loc);
             }
-            UIMenu.code.ButtonSureBack();
+            var me = prompt.AddComponent<SaveOnExit>();
+            Button[] buttons = prompt.GetComponentsInChildren<Button>(true);
+            // Same order as the template: the first button is the box's Yes (ButtonSureBack), the second its No.
+            Wire(buttons[0], "Save", new UnityAction(me.Save));
+            Wire(buttons[1], "Don't Save", new UnityAction(me.DontSave));
+            for (int i = 2; i < buttons.Length; i++)
+            {
+                buttons[i].gameObject.SetActive(false);
+            }
+            foreach (Text t in prompt.GetComponentsInChildren<Text>(true))
+            {
+                if (t.GetComponentInParent<Button>() == null)
+                {
+                    t.text = "Save the game before exiting?";
+                    break;
+                }
+            }
+            prompt.SetActive(false);
+            return true;
         }
 
-        public void Exit()
+        private static void Wire(Button b, string label, UnityAction action)
         {
-            Close();
-            UIMenu.code.ButtonSureBack();
+            b.onClick = new Button.ButtonClickedEvent();
+            b.interactable = true;
+            b.onClick.AddListener(action);
+            Text t = b.GetComponentInChildren<Text>(true);
+            if (t != null)
+            {
+                t.text = label;
+            }
         }
 
-        public void Cancel()
+        private static string Describe(Transform t, string indent)
         {
-            Close();
+            var sb = new StringBuilder();
+            Text text = t.GetComponent<Text>();
+            sb.Append(indent).Append(t.name);
+            if (t.GetComponent<Button>() != null)
+            {
+                sb.Append(" [Button]");
+            }
+            if (text != null)
+            {
+                sb.Append(" [Text \"").Append(text.text).Append("\"]");
+            }
+            sb.Append('\n');
+            for (int i = 0; i < t.childCount; i++)
+            {
+                sb.Append(Describe(t.GetChild(i), indent + "  "));
+            }
+            return sb.ToString();
+        }
+
+        public void Save()
+        {
+            Hide();
+            Mainframe.code.SaveGame();
+            ShowReturnBox();
+        }
+
+        public void DontSave()
+        {
+            Hide();
+            ShowReturnBox();
+        }
+
+        // SaveGame closes the pause menu, and the menu's OnEnable hides the return box, so reopen in that order.
+        private static void ShowReturnBox()
+        {
+            if (!UIMenu.code.gameObject.activeSelf)
+            {
+                UIMenu.code.ShowView(true);
+            }
+            UIMenu.code.uiReturn.SetActive(true);
         }
     }
 
@@ -155,6 +192,13 @@ namespace FreemanFixes
         private static bool BeforeBackToMainMenu()
         {
             return !SaveOnExit.Prompt();
+        }
+
+        // Closing/reopening the pause menu shouldn't bring back a half-answered prompt.
+        [HarmonyPostfix, HarmonyPatch(typeof(UIMenu), "OnEnable")]
+        private static void AfterMenuEnabled()
+        {
+            SaveOnExit.Hide();
         }
 
         [HarmonyPostfix, HarmonyPatch(typeof(OnFile), nameof(OnFile.SaveAll))]
