@@ -26,6 +26,7 @@ namespace FreemanFixes
             harmony = new Harmony("purgos.freeman.fixes." + System.DateTime.Now.Ticks);
             harmony.PatchAll();
             DevMode.Bind(Config);
+            SaveOnExit.Bind(Config);
             DevMode.AttachToExisting();
             Logger.LogInfo("Freeman Slop Mod loaded");
         }
