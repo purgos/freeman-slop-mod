@@ -3,7 +3,50 @@
 Unofficial BepInEx 5 plugin finishing/fixing parts of *Freeman: Guerrilla Warfare* (Unity 2018.3.14, Mono).
 Requires owning the game; this repo never contains game files (`decompiled/` is git-ignored, for reference only).
 
-## Setup (Linux / Proton)
+## Installing
+The mod is two DLLs, `FreemanFixes.dll` (the plugin) and `FreemanFixes.Patcher.dll` (a preloader patcher), loaded
+by BepInEx. There are no prebuilt downloads yet, so build them first (see [Building the DLLs](#building-the-dlls)).
+
+**Find the game folder:** Steam → right-click the game → Manage → Browse local files. That opens the launcher folder
+(with `StartFGW.exe`); everything below goes one level down, in the inner `Freeman Guerrilla Warfare` folder next to
+`Freeman Guerrilla Warfare.exe`. Typical paths:
+- Windows: `C:\Program Files (x86)\Steam\steamapps\common\Freeman Guerrilla Warfare\Freeman Guerrilla Warfare`
+- Linux: `~/.local/share/Steam/steamapps/common/Freeman Guerrilla Warfare/Freeman Guerrilla Warfare`
+  (Flatpak Steam: `~/.var/app/com.valvesoftware.Steam/.local/share/Steam/steamapps/common/...`)
+
+### Windows
+1. Download **BepInEx 5.4.23.2, `BepInEx_win_x64_5.4.23.2.zip`** from
+   [BepInEx releases](https://github.com/BepInEx/BepInEx/releases/tag/v5.4.23.2) and extract it into the game folder,
+   so `winhttp.dll`, `doorstop_config.ini` and `BepInEx\` sit next to `Freeman Guerrilla Warfare.exe`.
+2. Start the game once and quit; BepInEx creates `BepInEx\plugins`, `BepInEx\patchers` and `BepInEx\config`.
+3. Copy `FreemanFixes.dll` into `BepInEx\plugins\` and `FreemanFixes.Patcher.dll` into `BepInEx\patchers\`.
+4. Start the game. Settings > General now has a **Dev Mode** toggle, and `BepInEx\LiveLog.txt` says
+   "Freeman Slop Mod loaded".
+
+### Linux (Steam Proton)
+1. Same BepInEx zip as Windows (the **win_x64** build, not the Linux one; the game runs under Proton). Extract it
+   into the game folder next to `Freeman Guerrilla Warfare.exe`.
+2. Steam → right-click the game → Properties → Launch Options:
+   `WINEDLLOVERRIDES="winhttp=n,b" %command%`. Without it Proton ignores BepInEx's `winhttp.dll`.
+3. Start the game once and quit, then copy `FreemanFixes.dll` into `BepInEx/plugins/` and `FreemanFixes.Patcher.dll`
+   into `BepInEx/patchers/`.
+4. Start the game and check as on Windows. The patcher also fixes the white screen the game shows under Proton.
+
+**Campaign packs** someone shared go in `BepInEx/FreemanSlop_Mods/<name>/`. **Uninstall:** delete `winhttp.dll`,
+`doorstop_config.ini`, `.doorstop_version` and `BepInEx/` from the game folder (and the launch option on Linux).
+
+### Building the DLLs
+Needs the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) and the game with BepInEx installed (the
+build compiles against the game's DLLs and BepInEx's `core` folder). From the repo folder, with `<game>` being the
+game folder above:
+```
+dotnet build FreemanFixes/FreemanFixes.csproj -c Release -p:GameDir="<game>" -p:BepCore="<game>/BepInEx/core"
+dotnet build FreemanFixes.Patcher/FreemanFixes.Patcher.csproj -c Release -p:GameDir="<game>" -p:BepCore="<game>/BepInEx/core"
+```
+The DLLs land in `FreemanFixes/bin/Release/` and `FreemanFixes.Patcher/bin/Release/`. This works the same in
+PowerShell on Windows. On Linux, `./install.sh` does the build, checks and copying in one step (next section).
+
+## Development setup (Linux / Proton)
 Needs the .NET 8 SDK (`~/.dotnet`) and `ilspycmd` (`dotnet tool install -g ilspycmd --version 8.2.0.7535`; `install.sh` uses
 it to check the built DLLs). The build compiles against the game's own DLLs, so it only builds on a machine with the
 game installed. The game path is set for Flatpak Steam in two places: `GameDir` in
@@ -25,7 +68,6 @@ game installed. The game path is set for Flatpak Steam in two places: `GameDir` 
    `BepInEx/config/BepInEx.cfg`) shows the same live. The files below are buffered under Proton and often only land
    when the game exits: `<game>/BepInEx/LogOutput.log` (look for "Freeman Slop Mod loaded").
 
-Uninstall: delete `winhttp.dll`, `doorstop_config.ini`, `.doorstop_version`, `BepInEx/` from the game folder.
 
 ## Settings
 `<game>/BepInEx/config/purgos.freeman.fixes.cfg` (written on first run; BepInEx saves it with CRLF line endings):
