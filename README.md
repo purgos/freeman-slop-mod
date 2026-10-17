@@ -68,7 +68,6 @@ game installed. The game path is set for Flatpak Steam in two places: `GameDir` 
    `BepInEx/config/BepInEx.cfg`) shows the same live. The files below are buffered under Proton and often only land
    when the game exits: `<game>/BepInEx/LogOutput.log` (look for "Freeman Slop Mod loaded").
 
-
 ## Settings
 `<game>/BepInEx/config/purgos.freeman.fixes.cfg` (written on first run; BepInEx saves it with CRLF line endings):
 
