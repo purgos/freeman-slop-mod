@@ -4,8 +4,15 @@ Unofficial BepInEx 5 plugin finishing/fixing parts of *Freeman: Guerrilla Warfar
 Requires owning the game; this repo never contains game files (`decompiled/` is git-ignored, for reference only).
 
 ## Setup (Linux / Proton)
-1. BepInEx 5.4.23.2 win_x64 is unpacked into the game folder (`winhttp.dll`, `doorstop_config.ini`, `BepInEx/`).
-2. Steam → game → Properties → Launch Options: `WINEDLLOVERRIDES="winhttp=n,b" %command%`
+Needs the .NET 8 SDK (`~/.dotnet`) and `ilspycmd` (`dotnet tool install -g ilspycmd --version 8.2.0.7535`; `install.sh` uses
+it to check the built DLLs). The build compiles against the game's own DLLs, so it only builds on a machine with the
+game installed. The game path is set for Flatpak Steam in two places: `GameDir` in
+`FreemanFixes/FreemanFixes.csproj` and `GAME` in `install.sh`; change both if your Steam library is elsewhere.
+
+1. Unpack BepInEx 5.4.23.2 win_x64 (`vendor/BepInEx_win_x64_5.4.23.2.zip`) into the game folder (`winhttp.dll`,
+   `doorstop_config.ini`, `BepInEx/`).
+2. Steam → game → Properties → Launch Options: `WINEDLLOVERRIDES="winhttp=n,b" %command%` (Proton only; on Windows
+   BepInEx loads without it).
 3. `./install.sh` builds both DLLs; the preloader patcher goes to `BepInEx/patchers/`.
    - **Dev (default):** the plugin goes to `BepInEx/scripts/` and is hot-reloaded by ScriptEngine
      (BepInEx.Debug **r11.1**, unpack `ScriptEngine_r11.1.zip` into `vendor/scriptengine/`). `install.sh` copies
@@ -20,6 +27,22 @@ Requires owning the game; this repo never contains game files (`decompiled/` is 
 
 Uninstall: delete `winhttp.dll`, `doorstop_config.ini`, `.doorstop_version`, `BepInEx/` from the game folder.
 
+## Settings
+`<game>/BepInEx/config/purgos.freeman.fixes.cfg` (written on first run; BepInEx saves it with CRLF line endings):
+
+| Section | Key | Default | What it does |
+|---|---|---|---|
+| `Dev Mode` | `Enabled` | `false` | Dev mode on/off (same as the Settings toggle). |
+| `Dev Mode` | `ShowSettingsToggle` | `true` | Show the Dev Mode toggle in Settings > General. |
+| `Dev Mode` | `StoreFree` | `true` | Dev item store prices are free. |
+| `Save On Exit` | `Enabled` | `true` | Ask to save when leaving a manual-save game. |
+
+## Contributing
+GitHub ([purgos/freeman-slop-mod](https://github.com/purgos/freeman-slop-mod)) is the source repo. `main` is
+protected: every change goes through a pull request (branch → push → PR → merge), and force pushes are blocked. A
+private Forgejo copy pulls from GitHub hourly as a backup; don't push to it. Never commit game files or decompiled
+code (see License).
+
 ## UI conventions (standard for all UI work)
 AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules.
 
@@ -31,14 +54,14 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
 - **Leave the transfer panel's top bar alone** — don't put titles/labels/controls in it.
 - Log a new panel's hierarchy on first build (`DumpHierarchy`) to tune layout from real rect sizes.
 
-## Fixes
+## Fixes and features
 - **White screen under Proton** (preloader patcher): `StartFGW.exe` starts the game without a working directory;
   under Wine it lands in the exe's folder, so `Config.json`/StreamingAssets tables aren't found. The patcher
   `cd`s to the launcher folder before any game code runs (the plugin chainloader is too late).
 - **Personal ↔ faction fund transfer** (`UIData` transfer panel, `DepositPanelUi.cs`): native uGUI — the panel's
   amount becomes a typeable InputField and a 0/10/25/50/75/MAX row (clones of the panel's CANCEL button on a copy
   of its background) hangs below it; slider works (starts at 0, whole numbers); fixes vanilla crediting the other
-  side even when the debit failed. First open logs the panel hierarchy to `LogOutput.log` for layout tuning.
+  side even when the debit failed. First open logs the panel hierarchy to `LiveLog.txt` for layout tuning.
 - **Info popup** (`InfoPopupPatches.cs`): compacted — lines sit in a `GridLayoutGroup` (300x40 cells), shrunk to
   font×1.4 with no spacing; the popup height follows the cell height. Armor-proficiency line no longer clips its number.
 - **Popup placement** (`PopupPlacementPatches.cs`): the item info popup opens upward from the cursor, measured from
@@ -51,7 +74,7 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   Wood-Iron buttons are hidden. The full-screen menu (built from the game's own panel, header, row and button
   styles; a status line at the bottom shows results, since the game's popups draw behind it) has tabs:
   - **General:** set money, reputation, morale (+ 0/50/100), XP; Heal All; item store + free-prices toggle; export a
-    campaign background; add any soldier type (count); "turn off dev mode and hide its setting" (two clicks; sets
+    campaign background (name it in the **Background** box); add any soldier type (count); "turn off dev mode and hide its setting" (two clicks; sets
     `[Dev Mode] ShowSettingsToggle = false`, set it back to `true` to restore the Settings toggle).
   - **Factions:** per faction your relation, status (Hostile..Ally), trade and mutual-defense agreements, money, and
     a Wars side column for war/peace between any two factions; Make All Hostile / Neutral / Allies.
@@ -66,9 +89,9 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   the normal character creation (random world, character creator and faction name/flag as usual). It carries the
   whole party (soldier types + companions) with levels, XP and all stats, in the same squads (names, icons,
   formations, slot positions), everyone's exact loadout (every equipment slot), your bag, every city you own, your
-  money and faction funds, your relation/status/agreements with every faction and all faction-vs-faction wars. Each export is a **campaign pack** - a small mod depending on this one - in
-  `BepInEx/FreemanSlop_Mods/<name>/` (`manifest.json` with the required mod version + `campaign.json`); copy the
-  folder to share it. Packs load whether or not dev mode is on. Re-exporting a name asks for a second click.
+  money and faction funds, your relation/status/agreements with every faction and all faction-vs-faction wars.
+  Each export is a **campaign pack** (a small mod depending on this one) in `BepInEx/FreemanSlop_Mods/<name>/`
+  (`manifest.json` with the required mod version, currently 0.4.0+, and `campaign.json`); copy the folder to share it. Packs load whether or not dev mode is on. Re-exporting a name asks for a second click.
 - **Save extras** (`DevSaveData.cs`): the game's save drops some values (your max health, morale and extra equipment
   slots; companions' Leadership, Intelligence, skills, unspent points, max health and most equipment slots), so every
   save also writes `FreemanSlop.json` into its folder and loading that save restores them once the world is up.
@@ -79,11 +102,16 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
 
 ## Runtime gotchas (old Unity Mono, CLR 2.0)
 - Compile against the game's own `Managed/mscorlib|System|System.Core` (`NoStdLib`), not a .NET reference pack.
-- Avoid lambdas/static method groups in listeners — use instance methods on small MonoBehaviours.
+- Avoid lambdas/static method groups in listeners — use instance methods on small MonoBehaviours. No
+  `System.Func`/`System.Action`.
+- Don't compare `Type`/`FieldInfo` with `==`/`!=` (those operators don't exist in this runtime); cast to `object`.
 - Watch `params` calls (`Localization.Format(key)`, `TrimEnd()`, `GUILayout.*`) — pass explicit empty arrays.
 - No `Array.Empty` (pass explicit `new GUILayoutOption[0]` to `GUILayout` params) and `LangVersion` ≤ 10
-  (C# 11 `<>O` method-group delegate caches fail to load). `install.sh` refuses to install a DLL that uses them.
-- Logs: `BepInEx/LogOutput.log`; Unity: `compatdata/773951/pfx/drive_c/users/steamuser/AppData/LocalLow/KK Game Studio/Freeman Guerrilla Warfare/output_log.txt`.
+  (C# 11 `<>O` method-group delegate caches fail to load). `install.sh` refuses to install a DLL that uses any of
+  these.
+- Logs: read `BepInEx/LiveLog.txt` while the game runs. `BepInEx/LogOutput.log` and the Unity log
+  (`compatdata/773951/pfx/drive_c/users/steamuser/AppData/LocalLow/KK Game Studio/Freeman Guerrilla Warfare/output_log.txt`)
+  are buffered under Proton.
 
 ## Decompiling
 `DOTNET_ROLL_FORWARD=Major ilspycmd -p -o decompiled -r <Managed> <Managed>/Assembly-CSharp.dll`
