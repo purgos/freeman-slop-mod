@@ -72,8 +72,6 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
 - **Save extras** (`DevSaveData.cs`): the game's save drops some values (your max health, morale and extra equipment
   slots; companions' Leadership, Intelligence, skills, unspent points, max health and most equipment slots), so every
   save also writes `FreemanSlop.json` into its folder and loading that save restores them once the world is up.
-## Ideas / TODO
-- Diplomacy "Give money / Ask money / Persuade" (`UIPolitical`) confirm does nothing — unimplemented in vanilla.
 
 ## Runtime gotchas (old Unity Mono, CLR 2.0)
 - Compile against the game's own `Managed/mscorlib|System|System.Core` (`NoStdLib`), not a .NET reference pack.
