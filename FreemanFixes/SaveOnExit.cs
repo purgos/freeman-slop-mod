@@ -1,6 +1,8 @@
 using BepInEx.Configuration;
 using HarmonyLib;
+using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.UI;
 
 namespace FreemanFixes
 {
@@ -58,6 +60,7 @@ namespace FreemanFixes
                 return false;
             }
             var me = new SaveOnExit();
+            Raise();
             if (!CanSave())
             {
                 UIConfirmation.code.ShowConfirmation("You can't save right now. Exit to the main menu without saving?",
@@ -67,6 +70,7 @@ namespace FreemanFixes
             }
             if (SavedSinceLastChange())
             {
+                Lower();
                 return false;
             }
             UIConfirmation.code.ShowConfirmation("Save the game before exiting to the main menu?",
@@ -75,9 +79,56 @@ namespace FreemanFixes
             return true;
         }
 
-        public void SaveAndExit()
+        // The pause menu draws over the confirmation dialog, and hiding the menu would unpause the game (Global ties
+        // Time.timeScale to it). So while our prompt is up the dialog gets its own canvas sorted above the menu's.
+        private static Canvas raised;
+
+        private static void Raise()
+        {
+            GameObject dialog = UIConfirmation.code.gameObject;
+            if (raised != null || dialog.GetComponent<Canvas>() != null)
+            {
+                return;
+            }
+            int top = 0;
+            foreach (Canvas c in UIMenu.code.GetComponentsInParent<Canvas>(true))
+            {
+                top = Mathf.Max(top, c.sortingOrder);
+            }
+            foreach (Canvas c in UIMenu.code.GetComponentsInChildren<Canvas>(true))
+            {
+                top = Mathf.Max(top, c.sortingOrder);
+            }
+            raised = dialog.AddComponent<Canvas>();
+            raised.overrideSorting = true;
+            raised.sortingOrder = top + 10;
+            dialog.AddComponent<GraphicRaycaster>();
+        }
+
+        internal static void Lower()
+        {
+            if (raised == null)
+            {
+                return;
+            }
+            GraphicRaycaster r = raised.GetComponent<GraphicRaycaster>();
+            if (r != null)
+            {
+                Object.DestroyImmediate(r);
+            }
+            Object.DestroyImmediate(raised);
+            raised = null;
+        }
+
+        private static void Close()
         {
             UIConfirmation.code.Close();
+            Lower();
+        }
+
+        public void SaveAndExit()
+        {
+            Close();
             if (CanSave())
             {
                 Mainframe.code.SaveGame();
@@ -87,13 +138,13 @@ namespace FreemanFixes
 
         public void Exit()
         {
-            UIConfirmation.code.Close();
+            Close();
             UIMenu.code.ButtonSureBack();
         }
 
         public void Cancel()
         {
-            UIConfirmation.code.Close();
+            Close();
         }
     }
 

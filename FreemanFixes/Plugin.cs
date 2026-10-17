@@ -41,6 +41,7 @@ namespace FreemanFixes
             }
             DepositPanelUi.TeardownCurrent();
             InfoPopupPatches.Restore();
+            SaveOnExit.Lower();
             DevMode.Teardown();
             Logger.LogInfo("Freeman Slop Mod unloaded");
             if (liveLog != null)
