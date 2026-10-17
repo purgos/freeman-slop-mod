@@ -64,4 +64,6 @@ Breaking these compiles fine but fails in game, usually silently or as a white o
 ## Legal and repo rules
 - GPL-3.0. Commit only original code and docs. **Never commit or paste game code, decompiled output, game DLLs,
   assets or tables** (`decompiled/`, `decompiled-launcher/`, `vendor/` stay ignored).
-- Push only to Forgejo (`origin`); it mirrors to GitHub automatically. Don't push to GitHub directly.
+- GitHub (`origin`) is the source of truth; push and merge there. The Forgejo copy
+  (git.purgos.lilium.wtf/purgos/freeman-slop-mod) is a read-only pull mirror (hourly), so never push to it.
+- Work on feature branches and merge to `main` through PRs; keep `main` releasable.
