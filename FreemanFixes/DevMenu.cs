@@ -273,6 +273,7 @@ namespace FreemanFixes
             BuildTroopColumn(Column(colRt, TroopColumnWidth));
             BuildFactionsPage(root);
             BuildCompanionsPage(root);
+            BuildCitiesPage(root);
         }
 
         private void BuildPlayerColumn(Transform col)
@@ -595,6 +596,7 @@ namespace FreemanFixes
             SetValue(ActMorale, 0, Mathf.RoundToInt(MapAgent.code._Army.GetAverageMorale()).ToString());
             SetValue(ActXp, 0, MapAgent.code.gen.curExp + " (Lv " + MapAgent.code.gen.Level + ")");
             RefreshFactions();
+            RefreshCities();
             if (storeFreeLabel != null)
             {
                 storeFreeLabel.text = DevMode.StoreFree.Value ? "Store prices: FREE" : "Store prices: NORMAL";
@@ -633,7 +635,7 @@ namespace FreemanFixes
 
         internal void Do(int action, int arg)
         {
-            if (DoCompanions(action, arg) || DoFactions(action, arg))
+            if (DoCompanions(action, arg) || DoFactions(action, arg) || DoCities(action, arg))
             {
                 return;
             }

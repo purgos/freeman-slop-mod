@@ -15,7 +15,8 @@ namespace FreemanFixes
     //  - The campaign starts at the starting level: you are the character you just created, the party joins at
     //    its usual level, and nobody keeps exported levels or XP.
     //  - Copied: the whole party (soldier types + companions) in the same squads (names, icons, formations, slot
-    //    positions), your and your companions' attributes, skills and weapon stats, everyone's exact loadout
+    //    positions), your and your companions' attributes, skills and weapon stats (a companion's Marksmanship and
+    //    weapon stats become their base, CompanionBases) plus companion stats, everyone's exact loadout
     //    (every equipment slot, yours included), your
     //    bag (items + size), your money (InitMoney) and faction funds, and the political map: who owns every city,
     //    which factions are destroyed, your status/relation/trade/defense with every faction and all wars.
@@ -588,6 +589,9 @@ namespace FreemanFixes
                 if (heroes.TryGetValue(u.Id, out gen))
                 {
                     u.ApplyAttributesAndSkills(gen);
+                    u.ApplyCompanionStats(gen);
+                    // Marksmanship and weapon stats become this companion's base, so level-ups grow from them.
+                    CompanionBases.SetFromExport(gen, u.Stats, u.Level);
                     u.ApplyTo(gen);
                 }
             }
@@ -967,6 +971,16 @@ namespace FreemanFixes
             ApplyStats(g, hero, DevStats.Attributes);
             ApplyStats(g, hero, DevStats.Skills);
             ApplyStats(g, hero, DevStats.Weapons);
+        }
+
+        // Affection and governor stats (HeroAgent fields, kept by the game's save).
+        internal void ApplyCompanionStats(NPCGen g)
+        {
+            HeroAgent hero = g.GetComponent<HeroAgent>();
+            if (Stats != null && hero != null)
+            {
+                ApplyStats(g, hero, DevStats.CompanionStats);
+            }
         }
 
         private void ApplyStats(NPCGen g, HeroAgent hero, int[] ids)

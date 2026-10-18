@@ -50,7 +50,7 @@ namespace FreemanFixes
             var bar = new GameObject("Tabs", typeof(RectTransform));
             var rt = (RectTransform)bar.transform;
             rt.SetParent(root, false);
-            Place(rt, new Vector2(0.5f, 1f), new Vector2(0f, -100f), new Vector2(630f, 36f));
+            Place(rt, new Vector2(0.5f, 1f), new Vector2(0f, -100f), new Vector2(840f, 36f));
             var h = bar.AddComponent<HorizontalLayoutGroup>();
             h.spacing = 12f;
             h.childControlWidth = true;
@@ -60,6 +60,7 @@ namespace FreemanFixes
             MakeButton(bar.transform, "General", ActTabGeneral, 0);
             MakeButton(bar.transform, "Factions", ActTabFactions, 0);
             MakeButton(bar.transform, "Companions", ActTabCompanions, 0);
+            MakeButton(bar.transform, "Cities", ActTabCities, 0);
         }
 
         private void BuildCompanionsPage(RectTransform root)
@@ -136,6 +137,7 @@ namespace FreemanFixes
             generalPage.SetActive(page == generalPage);
             factionsPage.SetActive(page == factionsPage);
             companionsPage.SetActive(page == companionsPage);
+            citiesPage.SetActive(page == citiesPage);
             Refresh();
         }
 
@@ -252,6 +254,10 @@ namespace FreemanFixes
                     {
                         HeroAgent lh = heroes[arg];
                         NPCGen lg = lh != null ? lh.gen : MapAgent.code.gen;
+                        if (lh != null)
+                        {
+                            CompanionBases.Remember(lg); // level up from what they have, not from the table
+                        }
                         DevStats.Set(lg, lh, DevStats.Level, DevStats.MaxLevelFor(lg));
                         DevActions.Report(DevStats.DisplayName(lg) + ": level " + lg.Level);
                     }
@@ -271,6 +277,10 @@ namespace FreemanFixes
                         DevStats.Set(mg, mh, stat, DevStats.Max(stat));
                     }
                     DevStats.ClearUnspent(mg, mh, arg);
+                    if (mh != null)
+                    {
+                        CompanionBases.Remember(mg);
+                    }
                     string what = arg == 1 ? "skills" : arg == 2 ? "weapon proficiencies"
                         : arg == 3 ? "companion stats" : "attributes";
                     DevActions.Report(DevStats.DisplayName(mg) + ": all " + what + " set to max");
@@ -299,6 +309,10 @@ namespace FreemanFixes
                     HeroAgent h = heroes[selected];
                     NPCGen g = h != null ? h.gen : MapAgent.code.gen;
                     DevStats.Set(g, h, arg, value);
+                    if (h != null)
+                    {
+                        CompanionBases.Remember(g); // else the next level-up recomputes it from the table
+                    }
                     DevActions.Report(DevStats.DisplayName(g) + ": " + DevStats.Label(arg) + " set to " + DevStats.Get(g, h, arg));
                     field.text = string.Empty;
                     Refresh();

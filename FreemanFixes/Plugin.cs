@@ -28,6 +28,7 @@ namespace FreemanFixes
             DevMode.Bind(Config);
             SaveOnExit.Bind(Config);
             DevMode.AttachToExisting();
+            CompanionBases.RememberAll();
             Logger.LogInfo("Freeman Slop Mod loaded");
         }
 
