@@ -18,6 +18,8 @@ namespace FreemanFixes
         private const float RowHeight = 34f;
         private const float HeaderHeight = 28f;
         private const float TextSize = 21f;
+        private const float DescriptionRows = 4f;       // campaign description box height, in rows
+        private const int DescriptionMaxChars = 600;   // about a paragraph
         private const float PlayerColumnWidth = 560f;
         private const float TroopColumnWidth = 640f;
 
@@ -68,6 +70,7 @@ namespace FreemanFixes
         private Text storeFreeLabel;
         private Text campaignLabel;
         private InputField campaignName;
+        private InputField campaignDescription;
 
         internal static void Toggle()
         {
@@ -296,11 +299,28 @@ namespace FreemanFixes
             free.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
             storeFreeLabel = free.GetComponentInChildren<Text>(true);
             Spacer(col, 16f);
-            Header(col, "Export as new-game background");
+            Header(col, "Export as campaign (New Game list)");
             Transform nameRow = Row(col);
-            Label(nameRow, "Background", 140f, 0f);
+            Label(nameRow, "Name", 140f, 0f);
             campaignName = MakeInput(nameRow, 0f, InputField.ContentType.Standard);
             campaignName.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            Transform descRow = Row(col);
+            descRow.GetComponent<LayoutElement>().preferredHeight = RowHeight * DescriptionRows;
+            descRow.GetComponent<HorizontalLayoutGroup>().childAlignment = TextAnchor.UpperLeft;
+            Text descLabel = Label(descRow, "Description", 140f, 0f);
+            descLabel.alignment = TextAnchor.UpperLeft;
+            campaignDescription = MakeInput(descRow, 0f, InputField.ContentType.Standard);
+            campaignDescription.GetComponent<LayoutElement>().flexibleWidth = 1f;
+            // A paragraph: wraps and takes Enter as a new line; shown in the New Game list (DevCampaigns.Summary).
+            campaignDescription.lineType = InputField.LineType.MultiLineNewline;
+            campaignDescription.characterLimit = DescriptionMaxChars;
+            campaignDescription.textComponent.alignment = TextAnchor.UpperLeft;
+            campaignDescription.textComponent.horizontalOverflow = HorizontalWrapMode.Wrap;
+            campaignDescription.textComponent.verticalOverflow = VerticalWrapMode.Truncate;
+            Text descPh = (Text)campaignDescription.placeholder;
+            descPh.alignment = TextAnchor.UpperLeft;
+            descPh.horizontalOverflow = HorizontalWrapMode.Wrap;
+            descPh.text = "Shown when picking it under New Game";
             Transform saveRow = Row(col);
             Button save = MakeButton(saveRow, "", ActExportCampaign, 0);
             save.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
@@ -637,9 +657,10 @@ namespace FreemanFixes
                     DevMode.DisableAndHide(); // closes and removes this menu
                     return;
                 case ActExportCampaign:
-                    if (DevCampaigns.Export(campaignName.text, string.Empty))
+                    if (DevCampaigns.Export(campaignName.text, campaignDescription.text))
                     {
-                        campaignName.text = string.Empty; // keep it if it only asked to confirm a replace
+                        campaignName.text = string.Empty; // keep them if it only asked to confirm a replace
+                        campaignDescription.text = string.Empty;
                     }
                     Refresh();
                     return;
