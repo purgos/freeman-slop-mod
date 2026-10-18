@@ -147,6 +147,10 @@ namespace FreemanFixes
             }
             g.maxHealth = c.MaxHealth;
             g.curHealth = Mathf.Min(c.CurHealth, c.MaxHealth);
+            if (h != null)
+            {
+                CompanionBases.Remember(g); // the load's SetLevel scaled them from the table; these are theirs
+            }
         }
 
         internal static void Teardown()

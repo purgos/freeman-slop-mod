@@ -90,7 +90,7 @@ namespace FreemanFixes
 
     // In dev mode the cheat panel's "Add All Items" (dump every item into your bag) becomes "Dev Menu", and the
     // other add-everything / add-money / add-XP buttons are hidden (the dev menu replaces them), plus
-    // Neutrality and Add Wood/Metal/Iron at the user's request.
+    // Neutrality and Add Wood/Metal/Iron at the user's request, and the city cheats (the dev menu's Cities tab).
     // Names are UICheat.InitGM's.
     internal static class CheatButton
     {
@@ -98,7 +98,7 @@ namespace FreemanFixes
         private static readonly string[] Hidden =
         {
             "Get All Clothing", "Get all Weapons", "Add All Soldiers", "AddAllHero", "Add 1000000 cr", "Add 10000 exp",
-            "Neutrality", "Add Wood,Metal,Iron"
+            "Neutrality", "Add Wood,Metal,Iron", "AddAllCity", "AddRecentlyCity"
         };
         private static readonly List<GameObject> hiddenButtons = new List<GameObject>();
         private static Text label;

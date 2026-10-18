@@ -9,7 +9,7 @@ namespace FreemanFixes
     public class Plugin : BaseUnityPlugin
     {
         internal const string Id = "purgos.freeman.fixes";
-        internal const string Version = "0.4.0";
+        internal const string Version = "0.5.0";
 
         internal static ManualLogSource Log;
 
@@ -28,6 +28,7 @@ namespace FreemanFixes
             DevMode.Bind(Config);
             SaveOnExit.Bind(Config);
             DevMode.AttachToExisting();
+            CompanionBases.RememberAll();
             Logger.LogInfo("Freeman Slop Mod loaded");
         }
 

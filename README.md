@@ -112,10 +112,10 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   by default. Toggle it in the game's **Settings > General > Dev Mode** (or `[Dev Mode] Enabled` in
   `BepInEx/config/purgos.freeman.fixes.cfg`). Off = the whole End-key cheat panel is disabled, vanilla cheats too.
   On = in the cheat panel "Add All Items" becomes **Dev Menu** and the give-all / add-money / add-XP / Neutrality /
-  Wood-Iron buttons are hidden. The full-screen menu (built from the game's own panel, header, row and button
+  Wood-Iron and city buttons are hidden. The full-screen menu (built from the game's own panel, header, row and button
   styles; a status line at the bottom shows results, since the game's popups draw behind it) has tabs:
   - **General:** set money, reputation, morale (+ 0/50/100), XP; Heal All; item store + free-prices toggle; export a
-    campaign background (name it in the **Background** box); add any soldier type (count); "turn off dev mode and hide its setting" (two clicks; sets
+    campaign pack (a **Name** and a paragraph-long **Description**, shown in the New Game list); add any soldier type (count); "turn off dev mode and hide its setting" (two clicks; sets
     `[Dev Mode] ShowSettingsToggle = false`, set it back to `true` to restore the Settings toggle).
   - **Factions:** per faction your relation, status (Hostile..Ally), trade and mutual-defense agreements, money, and
     a Wars side column for war/peace between any two factions; Make All Hostile / Neutral / Allies.
@@ -123,16 +123,31 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
     and Edit / Max Lv / Recruit / "Recruit All Companions" (skips anyone already yours, per `Faction.GetAllHero`);
     stat editor for level, health, morale, unspent points, attributes, skills, weapon proficiency, affection and
     governor stats (cap 10), with Max All Attributes / Skills / Weapons / Companion Stats (zeroing those points).
+  - **Cities:** Take All Cities, and every city with its owner: press **Owner** on a city and **Give** it to any
+    faction. A change that would leave a faction with nothing (so the game destroys it) asks for a second click.
+    Replaces the cheat panel's AddAllCity / AddRecentlyCity, which are hidden in dev mode.
   - **Item store:** a trader with one of every item that never runs out (restocked after every click, keeping
     anything you sold so Revert works), in category pages of up to 200 (the trade grid is a fixed 250 slots); page,
     Free and two-click Clear Bag controls in the trade screen's top bar; Deal works for free trades.
-- **Campaign backgrounds** (`DevCampaigns.cs`): the dev menu exports the current game as a new start background in
-  the normal character creation (random world, character creator and faction name/flag as usual). It carries the
-  whole party (soldier types + companions) with levels, XP and all stats, in the same squads (names, icons,
-  formations, slot positions), everyone's exact loadout (every equipment slot), your bag, every city you own, your
-  money and faction funds, your relation/status/agreements with every faction and all faction-vs-faction wars.
+- **Campaign packs** (`DevCampaigns.cs`, `CampaignMenu.cs`): the dev menu exports the current game as a campaign
+  of its own, with a name and a paragraph-long description. It shows up in **New Game** after the game's story
+  campaigns (Native mod only, since that's the only mod with that list), with the description and a summary, and
+  starts the same way a story does: Normal/Realistic, then the usual character creation with the game's own
+  backgrounds (packs are never backgrounds). The campaign starts at the starting level: you are the character you
+  just created and the party joins at its usual level. What the pack sets: your and your companions' attributes,
+  skills and weapon stats (a companion's Marksmanship and weapon stats become their base, see Companion bases)
+  and companion stats (affection, governor stats); the whole party (soldier types + companions) in the same squads (names, icons, formations,
+  slot positions) with everyone's exact loadout (every equipment slot, yours included); your bag, money and faction
+  funds; and the political map: who owns every city, which factions are destroyed, your
+  relation/status/agreements with every faction and all faction-vs-faction wars. Packs exported before 0.5.0 have
+  no map and only hand over your own cities.
   Each export is a **campaign pack** (a small mod depending on this one) in `BepInEx/FreemanSlop_Mods/<name>/`
-  (`manifest.json` with the required mod version, currently 0.4.0+, and `campaign.json`); copy the folder to share it. Packs load whether or not dev mode is on. Re-exporting a name asks for a second click.
+  (`manifest.json` with the required mod version, currently 0.5.0+, and `campaign.json`); copy the folder to share it. Packs load whether or not dev mode is on. Re-exporting a name asks for a second click.
+- **Companion bases** (`CompanionBases.cs`): a companion's Marksmanship and weapon stats come from their soldier
+  table row, and the game recomputes them from it on every level-up and every load (`NPCGen.SetLevel`), so values
+  set in the dev menu or by a campaign pack used to vanish. A companion whose values differ from the table now gets
+  a base of their own, which the game's level scaling grows from instead. It's rebuilt from the stats restored on
+  load (Save extras), so it needs no file of its own. Companions that match their table level up as in vanilla.
 - **Save extras** (`DevSaveData.cs`): the game's save drops some values (your max health, morale and extra equipment
   slots; companions' Leadership, Intelligence, skills, unspent points, max health and most equipment slots), so every
   save also writes `FreemanSlop.json` into its folder and loading that save restores them once the world is up.

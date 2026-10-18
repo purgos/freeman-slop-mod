@@ -263,6 +263,111 @@ namespace FreemanFixes
             Done(a.Name + (war ? " now at war with " : " at peace with ") + b.Name);
         }
 
+        // A city changes hands the way UICheat.AddAllCity does it (refresh its garrison flag, drop its governor), but
+        // through Army.SetFaction like the story setup (Mainframe.LoadFaction), so its squads and villages follow.
+        internal static void SetCityOwner(City city, Faction to)
+        {
+            if (city == null || city._Army == null || to == null || city._Army.faction == to)
+            {
+                return;
+            }
+            GiveCity(city, to);
+            Faction me = MapAgent.code._Army.faction;
+            if (to == me && me.GetAllCity().Count == 1) // UICheat.AddRecentlyCity: your first city
+            {
+                OfferIndependence();
+            }
+            Done(city.Name + " now belongs to " + to.Name);
+        }
+
+        internal static void TakeAllCities()
+        {
+            Faction me = MapAgent.code._Army.faction;
+            int taken = 0;
+            foreach (Transform t in Global.code.locations.items)
+            {
+                City city = t != null ? t.GetComponent<City>() : null;
+                if (city != null && city._Army != null && city._Army.faction != me)
+                {
+                    GiveCity(city, me);
+                    taken++;
+                }
+            }
+            if (me.GetAllCity().Count > 0) // UICheat.AddAllCity
+            {
+                OfferIndependence();
+            }
+            Done(taken + " cities taken");
+        }
+
+        // Factions the game would wipe out after this: Faction.EndHour destroys one with no locations, camps or
+        // heroes left (never Player or REBEL; id 999 goes by map armies instead).
+        internal static System.Collections.Generic.List<Faction> DestroyedBy(City city, Faction to)
+        {
+            var result = new System.Collections.Generic.List<Faction>();
+            Faction from = city != null && city._Army != null ? city._Army.faction : null;
+            if (from != null && from != to && WouldBeDestroyed(from, 1))
+            {
+                result.Add(from);
+            }
+            return result;
+        }
+
+        internal static System.Collections.Generic.List<Faction> DestroyedByTakeAll()
+        {
+            Faction me = MapAgent.code._Army.faction;
+            var lost = new System.Collections.Generic.Dictionary<Faction, int>();
+            foreach (Transform t in Global.code.locations.items)
+            {
+                City city = t != null ? t.GetComponent<City>() : null;
+                Faction f = city != null && city._Army != null ? city._Army.faction : null;
+                if (f != null && f != me)
+                {
+                    int n;
+                    lost.TryGetValue(f, out n);
+                    lost[f] = n + 1;
+                }
+            }
+            var result = new System.Collections.Generic.List<Faction>();
+            foreach (System.Collections.Generic.KeyValuePair<Faction, int> kv in lost)
+            {
+                if (WouldBeDestroyed(kv.Key, kv.Value))
+                {
+                    result.Add(kv.Key);
+                }
+            }
+            return result;
+        }
+
+        private static bool WouldBeDestroyed(Faction f, int losing)
+        {
+            if (f.isDestroyed || f.name == "Player" || f.name == "REBEL" || f.id == 999)
+            {
+                return false;
+            }
+            return f.GetAllCityAndCampCount().Count - losing <= 0 && f.GetAllHero().Count <= 0;
+        }
+
+        private static void GiveCity(City city, Faction to)
+        {
+            city.IsRefreshSolide = true;
+            city.ClearCityManager();
+            city._Army.SetFaction(to);
+        }
+
+        // UICheat's follow-up: while your faction is still unnamed ("ME"), owning a city offers to found it.
+        private static void OfferIndependence()
+        {
+            Faction me = MapAgent.code._Army.faction;
+            if (me.Name != Ex.Localization.Format("ME", new object[0]) || UINotice.code == null || UICampaign.code == null)
+            {
+                return;
+            }
+            UINotice.code.ShowNotice("DIPLOMACY_DULI");
+            UINotice.code.ok.onClick.AddListener(UICampaign.code.ShowFactionPanel);
+            DevMenu.ShowStatus("Close the dev menu to name your new faction", true);
+        }
+
         internal static void SetFactionMoney(Faction f, int value)
         {
             if (f == null)

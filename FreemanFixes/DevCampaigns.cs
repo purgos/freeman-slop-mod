@@ -8,15 +8,21 @@ using UnityEngine;
 
 namespace FreemanFixes
 {
-    // Exported campaigns: from dev mode, turn the current game into a new start "background" in the normal
-    // character-creation dialog (UICampaign.ShowPLayerPreSetDialog_1 lists every Table_PlayerPresets entry).
-    // A new game with it is otherwise completely normal (random world, character creator, faction name/flag).
-    //  - Copied: the whole party (soldier types + companions) with levels, XP and all stats, in the same squads (names,
-    //    icons, formations, slot positions), everyone's exact loadout (every equipment slot, yours included), your
-    //    bag (items + size), every city you own (the game itself only hands out the first preset city in
-    //    MapAgent.Initiate, so the rest are given the same way once the world is up), your money (InitMoney), your
-    //    faction's funds, your status/relation/trade/defense with every faction, and all faction-vs-faction wars.
-    //  - Everything else comes from the background you started this game with (your gen.Id preset).
+    // Exported campaigns: from dev mode, turn the current game into a campaign of its own in the New Game list, next
+    // to the game's story campaigns (CampaignMenu). Starting one runs the story-campaign flow: Normal/Realistic, then
+    // the usual character creation with the game's own backgrounds. While MapAgent.Initiate sets up the new game, the
+    // chosen background's party, cities and money are swapped for the pack's (BeforeNewGameSetup).
+    //  - The campaign starts at the starting level: you are the character you just created, the party joins at
+    //    its usual level, and nobody keeps exported levels or XP.
+    //  - Copied: the whole party (soldier types + companions) in the same squads (names, icons, formations, slot
+    //    positions), your and your companions' attributes, skills and weapon stats (a companion's Marksmanship and
+    //    weapon stats become their base, CompanionBases) plus companion stats, everyone's exact loadout
+    //    (every equipment slot, yours included), your
+    //    bag (items + size), your money (InitMoney) and faction funds, and the political map: who owns every city,
+    //    which factions are destroyed, your status/relation/trade/defense with every faction and all wars.
+    //  - Everything else comes from the background picked in character creation.
+    // The map goes in where a story campaign sets up its factions (Mainframe.LoadBattleData, before the factions buy
+    // their map armies); relations and wars wait until the world has settled (DevCampaignRunner).
     // Each export is a campaign pack - a small mod that depends on this one - in BepInEx/FreemanSlop_Mods/<name>/
     // (manifest.json + campaign.json; copy the folder to share it). Packs are added to the preset table in memory
     // after the game loads its tables (TableManager.Initialize), so no game files change. Names show via localization keys the mod
@@ -245,13 +251,81 @@ namespace FreemanFixes
                 st.Trading = f.isTrading;
                 st.Defense = f.isAttackAneDefend;
                 st.Enemies = new List<string>(f.enemyFactions);
+                st.Destroyed = f.isDestroyed;
+                foreach (Transform t2 in f.GetAllCity())
+                {
+                    City city = t2 != null ? t2.GetComponent<City>() : null; // villages follow their city
+                    if (city != null)
+                    {
+                        st.Cities.Add(city.id);
+                    }
+                }
                 c.Factions.Add(st);
             }
             WritePack(folder, c);
             Inject();
             DevActions.Report("Campaign \"" + name + "\" exported: " + c.Troops.Count + " troops, " +
-                c.Companions.Count + " companions, " + c.Cities.Count + " cities - pick it as your background in a new game");
+                c.Companions.Count + " companions, " + c.Cities.Count + " cities - start it from New Game");
             return true;
+        }
+
+        // ---------------------------------------------------------------- New Game list (CampaignMenu)
+
+        // Loaded packs by preset ID, in folder order. The preset ID doubles as the pack's Mainframe.battleID.
+        internal static Dictionary<int, DevCampaign> Active
+        {
+            get { return active; }
+        }
+
+        internal static bool IsPack(int presetId)
+        {
+            return active.ContainsKey(presetId);
+        }
+
+        internal static string NameKey(int presetId)
+        {
+            return "FREEMANSLOP_CAMPAIGN_" + presetId;
+        }
+
+        // The pack picked in the New Game list, if the game being set up is one (story flow: isClassical false and
+        // battleID set by Mainframe.SetBattle; battleID stays stale after picking Classical, hence the isClassical check).
+        internal static DevCampaign Selected
+        {
+            get
+            {
+                DevCampaign c;
+                return Mainframe.code != null && Mainframe.code.isBattleMode && !Mainframe.code.isClassical
+                    && active.TryGetValue(Mainframe.code.battleID, out c) ? c : null;
+            }
+        }
+
+        internal static string Summary(DevCampaign c)
+        {
+            int cities = 0;
+            int factions = 0;
+            foreach (FactionState st in c.Factions)
+            {
+                if (st.Cities != null && st.Cities.Count > 0)
+                {
+                    cities += st.Cities.Count;
+                    factions++;
+                }
+            }
+            var sb = new System.Text.StringBuilder();
+            if (!string.IsNullOrEmpty(c.Description))
+            {
+                sb.Append(c.Description).Append("\n\n");
+            }
+            sb.Append("Party: ").Append(c.Troops.Count).Append(" soldiers, ").Append(c.Companions.Count)
+                .Append(" companions in ").Append(c.Squads.Count).Append(" squads\n");
+            sb.Append("Money: ").Append(c.Money).Append(", faction funds: ").Append(c.FactionMoney)
+                .Append(", bag: ").Append(c.Bag.Count).Append(" items\n");
+            sb.Append("Your cities: ").Append(c.Cities.Count);
+            if (factions > 0)
+            {
+                sb.Append(" (map: ").Append(cities).Append(" cities held by ").Append(factions).Append(" factions)");
+            }
+            return sb.ToString();
         }
 
         private static string SafeName(string name)
@@ -326,27 +400,13 @@ namespace FreemanFixes
                     Plugin.Log.LogWarning("Campaign \"" + c.Name + "\": background " + c.BasePreset +
                         " not found, using " + basePreset.ID);
                 }
-                // Deep copy of the background the campaign was exported from.
-                var p = JsonConvert.DeserializeObject<Table_PlayerPresets>(JsonConvert.SerializeObject(basePreset));
-                p.ID = nextId++;
-                string nameKey = "FREEMANSLOP_CAMPAIGN_" + p.ID;
-                AddText(nameKey, c.Name);
-                p.QuestKey = nameKey;
-                p.Desc = c.Description;
-                p.Soldiers = new List<int>();
-                foreach (Uniform u in c.Troops)
-                {
-                    p.Soldiers.Add(u.Id);
-                }
-                p.Heros = new List<int>();
-                foreach (Uniform u in c.Companions)
-                {
-                    p.Heros.Add(u.Id);
-                }
-                p.Citys = new List<int>(c.Cities);
-                p.InitMoney = c.Money;
-                presets[p.ID] = p;
-                active[p.ID] = c;
+                // Packs aren't backgrounds, but saves started from one before 0.5.0 have its ID as the player's gen.Id
+                // and NPCGen looks that up on every level-up (BaseHealth): keep the ID, pointing at the game's own
+                // background it was based on. Never offered in character creation (CampaignMenu).
+                int id = nextId++;
+                AddText(NameKey(id), c.Name);
+                presets[id] = basePreset;
+                active[id] = c;
             }
             if (active.Count > 0)
             {
@@ -396,6 +456,7 @@ namespace FreemanFixes
                 }
             }
             active.Clear();
+            CampaignMenu.Teardown();
             pending = null;
             if (runner != null)
             {
@@ -406,16 +467,62 @@ namespace FreemanFixes
 
         // ---------------------------------------------------------------- new game with an exported background
 
+        // Prefix for MapAgent.Initiate, which spawns the party, money and first city from
+        // RM.code.TabPlayerPresetsData[UICampaign.code.PlayerPresetID]: for that one call the chosen background's
+        // entry is a copy carrying the pack's soldiers, companions, cities and money. RestorePreset puts it back.
+        private static Table_PlayerPresets swappedPreset;
+
+        internal static void BeforeNewGameSetup()
+        {
+            swappedPreset = null;
+            DevCampaign c = Selected;
+            if (c == null || UICampaign.code == null || Mainframe.code.IsFromFile())
+            {
+                return;
+            }
+            Dictionary<int, Table_PlayerPresets> presets = RM.code.TabPlayerPresetsData;
+            int id = UICampaign.code.PlayerPresetID;
+            Table_PlayerPresets chosen;
+            if (!presets.TryGetValue(id, out chosen))
+            {
+                return;
+            }
+            var p = JsonConvert.DeserializeObject<Table_PlayerPresets>(JsonConvert.SerializeObject(chosen));
+            p.Soldiers = new List<int>();
+            foreach (Uniform u in c.Troops)
+            {
+                p.Soldiers.Add(u.Id);
+            }
+            p.Heros = new List<int>();
+            foreach (Uniform u in c.Companions)
+            {
+                p.Heros.Add(u.Id);
+            }
+            p.Citys = new List<int>(c.Cities);
+            p.InitMoney = c.Money;
+            swappedPreset = chosen;
+            presets[id] = p;
+        }
+
+        internal static void RestorePreset()
+        {
+            if (swappedPreset != null)
+            {
+                RM.code.TabPlayerPresetsData[swappedPreset.ID] = swappedPreset;
+                swappedPreset = null;
+            }
+        }
+
         // Postfix for MapAgent.Initiate (new game setup): uniforms + faction funds, which presets can't express;
-        // cities beyond the first and the political map wait until the world is up (DevCampaignRunner).
+        // the cities follow in ApplyMap, relations and wars once the world is up (DevCampaignRunner).
         internal static void AfterNewGameSetup()
         {
             if (UICampaign.code == null)
             {
                 return;
             }
-            DevCampaign c;
-            if (!active.TryGetValue(UICampaign.code.PlayerPresetID, out c) || (Mainframe.code != null && Mainframe.code.IsFromFile()))
+            DevCampaign c = Selected;
+            if (c == null || Mainframe.code.IsFromFile())
             {
                 return;
             }
@@ -423,8 +530,11 @@ namespace FreemanFixes
             NPCGen me = MapAgent.code.gen;
             if (c.Player != null)
             {
-                c.Player.ApplyLevelAndStats(me);
+                c.Player.ApplyAttributesAndSkills(me);
                 c.Player.ApplyTo(me);
+                // NPCGen.LevelUp's player formula, so the carried-over Constitution counts.
+                me.maxHealth = RM.code.TabPlayerPresetsData[me.Id].BaseHealth + me.constitution * Global.ConstitutionFactor;
+                me.curHealth = me.maxHealth;
             }
             if (c.Bag != null && c.Bag.Count > 0)
             {
@@ -470,7 +580,6 @@ namespace FreemanFixes
                 if (liveByType.TryGetValue(c.Troops[i].Id, out q) && q.Count > 0)
                 {
                     troops[i] = q.Dequeue();
-                    c.Troops[i].ApplyLevelAndStats(troops[i]);
                     c.Troops[i].ApplyTo(troops[i]);
                 }
             }
@@ -479,7 +588,10 @@ namespace FreemanFixes
                 NPCGen gen;
                 if (heroes.TryGetValue(u.Id, out gen))
                 {
-                    u.ApplyLevelAndStats(gen);
+                    u.ApplyAttributesAndSkills(gen);
+                    u.ApplyCompanionStats(gen);
+                    // Marksmanship and weapon stats become this companion's base, so level-ups grow from them.
+                    CompanionBases.SetFromExport(gen, u.Stats, u.Level);
                     u.ApplyTo(gen);
                 }
             }
@@ -487,7 +599,7 @@ namespace FreemanFixes
             {
                 RebuildSquads(c, heroes, troops);
             }
-            Plugin.Log.LogInfo("Campaign \"" + c.Name + "\": levels, stats, loadouts, bag and faction funds applied");
+            Plugin.Log.LogInfo("Campaign \"" + c.Name + "\": attributes, skills, weapon stats, loadouts, bag and faction funds applied");
             pending = c;
             if (runner == null)
             {
@@ -581,37 +693,97 @@ namespace FreemanFixes
             return slot[0] == 'T' && n >= 0 && n < troops.Length ? troops[n] : null;
         }
 
-        // Once the new world is up: the extra cities and the political map.
-        internal static void ApplyWorld(DevCampaign c)
+        // Replaces Mainframe.LoadBattleData for a pack (story data would destroy every faction not in the story):
+        // hands every city to its exported owner, the way the story code does (Army.SetFaction), and marks the
+        // factions that were destroyed (story code: unless NotCanDestory). Your own cities get a fresh garrison like
+        // MapAgent.Initiate's preset city. Packs from before 0.5.0 only list your cities (Cities).
+        internal static void ApplyMap(DevCampaign c)
         {
             Faction me = MapAgent.code._Army.faction;
-            int extraCities = 0;
-            for (int i = 1; i < c.Cities.Count; i++) // [0] was handed out by the game from the preset
+            bool hasMap = false;
+            foreach (FactionState st in c.Factions)
             {
-                City city = Global.code.GetCityById(c.Cities[i]);
-                if (city == null || city._Army.faction == me)
+                if (st.Cities != null && st.Cities.Count > 0)
+                {
+                    hasMap = true;
+                }
+            }
+            int moved = 0;
+            if (!hasMap)
+            {
+                foreach (int id in c.Cities)
+                {
+                    if (GiveCity(Global.code.GetCityById(id), me, me))
+                    {
+                        moved++;
+                    }
+                }
+                Plugin.Log.LogInfo("Campaign \"" + c.Name + "\": no map in this pack, " + moved + " of your cities handed over");
+                return;
+            }
+            int destroyed = 0;
+            foreach (FactionState st in c.Factions)
+            {
+                Faction f = Global.code.GetFactionByName(st.Name);
+                if (f == null)
                 {
                     continue;
                 }
-                // Same steps as MapAgent.Initiate's preset-city code.
-                city.IsRefreshSolide = true;
-                city.ClearCityManager();
-                city._Army.SetFaction(me);
-                city._Army.squads.DeleteItems();
-                if (me.PossibleSoldiers.items.Count > 0)
+                if (st.Destroyed && !f.NotCanDestory)
                 {
-                    for (int n = 0; n < 15; n++)
+                    f.isDestroyed = true;
+                    destroyed++;
+                }
+                if (st.Cities == null)
+                {
+                    continue;
+                }
+                foreach (int id in st.Cities)
+                {
+                    if (GiveCity(Global.code.GetCityById(id), f, me))
                     {
-                        Transform type = me.PossibleSoldiers.items[UnityEngine.Random.Range(0, me.PossibleSoldiers.items.Count)];
-                        Transform soldier = type != null ? city._Army.CreateNewSoldier(type) : null;
-                        if (soldier != null)
-                        {
-                            city._Army.AddSoldiers(soldier);
-                        }
+                        moved++;
                     }
                 }
-                extraCities++;
             }
+            Plugin.Log.LogInfo("Campaign \"" + c.Name + "\": map applied, " + moved + " cities changed hands, " +
+                destroyed + " factions destroyed");
+        }
+
+        private static bool GiveCity(City city, Faction to, Faction me)
+        {
+            if (city == null || city._Army == null || city._Army.faction == to)
+            {
+                return false;
+            }
+            if (to != me)
+            {
+                city._Army.SetFaction(to);
+                return true;
+            }
+            // Same steps as MapAgent.Initiate's preset-city code.
+            city.IsRefreshSolide = true;
+            city.ClearCityManager();
+            city._Army.SetFaction(me);
+            city._Army.squads.DeleteItems();
+            if (me.PossibleSoldiers.items.Count > 0)
+            {
+                for (int n = 0; n < 15; n++)
+                {
+                    Transform type = me.PossibleSoldiers.items[UnityEngine.Random.Range(0, me.PossibleSoldiers.items.Count)];
+                    Transform soldier = type != null ? city._Army.CreateNewSoldier(type) : null;
+                    if (soldier != null)
+                    {
+                        city._Army.AddSoldiers(soldier);
+                    }
+                }
+            }
+            return true;
+        }
+
+        // Once the new world is up: relations, agreements and wars.
+        internal static void ApplyWorld(DevCampaign c)
+        {
             int factionCount = 0;
             foreach (FactionState st in c.Factions)
             {
@@ -637,8 +809,7 @@ namespace FreemanFixes
                 }
                 factionCount++;
             }
-            DevActions.Report("Campaign \"" + c.Name + "\": " + (c.Cities.Count > 0 ? 1 + extraCities : 0) + " cities, " +
-                factionCount + " factions' relations restored");
+            DevActions.Report("Campaign \"" + c.Name + "\": " + factionCount + " factions' relations restored");
         }
     }
 
@@ -685,6 +856,8 @@ namespace FreemanFixes
         public bool Trading;
         public bool Defense;
         public List<string> Enemies = new List<string>();
+        public bool Destroyed;
+        public List<int> Cities = new List<int>(); // City.id of every city it holds (0.5.0+)
     }
 
     // Waits for the new world to finish setting up, then applies the campaign's cities and politics once.
@@ -787,37 +960,38 @@ namespace FreemanFixes
             }
         }
 
-        // Level, XP and every stat, exactly. Companions/soldiers get the level through NPCGen.SetLevel first (it
-        // recomputes their table-based stats), then the saved values overwrite those. The player gets the level set
-        // directly (SetLevel's player branch would hand out level-up points on top of the saved ones).
-        internal void ApplyLevelAndStats(NPCGen g)
+        // Attributes, skills and weapon stats only (campaign packs start at the starting level).
+        internal void ApplyAttributesAndSkills(NPCGen g)
         {
-            if (Level <= 0)
+            if (Stats == null)
             {
-                return; // exported before levels/stats were included
+                return;
             }
             HeroAgent hero = g.GetComponent<HeroAgent>();
-            if (g.GetComponent<MapAgent>() != null)
+            ApplyStats(g, hero, DevStats.Attributes);
+            ApplyStats(g, hero, DevStats.Skills);
+            ApplyStats(g, hero, DevStats.Weapons);
+        }
+
+        // Affection and governor stats (HeroAgent fields, kept by the game's save).
+        internal void ApplyCompanionStats(NPCGen g)
+        {
+            HeroAgent hero = g.GetComponent<HeroAgent>();
+            if (Stats != null && hero != null)
             {
-                g.Level = Level;
-                g.nextExp = Level * 200 + Level * Level * 600; // NPCGen.SetLevel's formula
+                ApplyStats(g, hero, DevStats.CompanionStats);
             }
-            else
+        }
+
+        private void ApplyStats(NPCGen g, HeroAgent hero, int[] ids)
+        {
+            foreach (int id in ids)
             {
-                g.SetLevel(Level);
-            }
-            g.curExp = Exp;
-            if (Stats != null)
-            {
-                foreach (KeyValuePair<int, int> kv in Stats)
+                int v;
+                if (Stats.TryGetValue(id, out v))
                 {
-                    DevStats.Set(g, hero, kv.Key, kv.Value);
+                    DevStats.Set(g, hero, id, v);
                 }
-            }
-            if (MaxHealth > 0f)
-            {
-                g.maxHealth = MaxHealth;
-                g.curHealth = MaxHealth;
             }
         }
 
@@ -858,10 +1032,44 @@ namespace FreemanFixes
             DevCampaigns.Inject();
         }
 
+        [HarmonyPrefix, HarmonyPatch(typeof(MapAgent), nameof(MapAgent.Initiate))]
+        private static void NewGameSettingUp()
+        {
+            DevCampaigns.BeforeNewGameSetup();
+        }
+
         [HarmonyPostfix, HarmonyPatch(typeof(MapAgent), nameof(MapAgent.Initiate))]
         private static void NewGameSetUp()
         {
             DevCampaigns.AfterNewGameSetup();
+        }
+
+        // Runs even if Initiate throws, so the background never keeps the pack's party.
+        [HarmonyFinalizer, HarmonyPatch(typeof(MapAgent), nameof(MapAgent.Initiate))]
+        private static void NewGameSetupDone()
+        {
+            DevCampaigns.RestorePreset();
+        }
+
+        // Skipping prefix for a pack: InitGameObject.Awake calls LoadBattleData for every non-Classical new game,
+        // and the story code would destroy every faction its (absent) story rows don't list.
+        [HarmonyPrefix, HarmonyPatch(typeof(Mainframe), nameof(Mainframe.LoadBattleData))]
+        private static bool StoryDataLoading()
+        {
+            DevCampaign c = DevCampaigns.Selected;
+            if (c == null)
+            {
+                return true;
+            }
+            try
+            {
+                DevCampaigns.ApplyMap(c);
+            }
+            catch (Exception e)
+            {
+                Plugin.Log.LogError("Campaign map setup failed: " + e);
+            }
+            return false;
         }
     }
 }
