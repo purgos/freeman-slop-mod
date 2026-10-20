@@ -150,6 +150,11 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
 
   The sort stays applied as items move, keeps your bag's special slots in place and doesn't disturb a pending trade.
   Settings last for the session. The dev store keeps its own category pages instead of the Category button.
+- **Recruit sort** (`RecruitSort.cs`): the troop recruitment screen (cities, villages, mercenary camps) gets a sort
+  dropdown and a High/Low first button in its header, left of the equipment toggle: Default (the game's order), Name, Level,
+  Marksmanship, Price (with or without gear, as the toggle says), Health, Weapon damage (their gun) or Armor (all
+  their gear). The order holds after each purchase; the choice lasts for the session. Each soldier's row also shows
+  a line with their damage, armor and health under level and marksmanship.
 - **Campaign packs** (`DevCampaigns.cs`, `CampaignMenu.cs`): the dev menu exports the current game as a campaign
   of its own, with a name and a paragraph-long description. It shows up in **New Game** after the game's story
   campaigns (Native mod only, since that's the only mod with that list), with the description and a summary, and
