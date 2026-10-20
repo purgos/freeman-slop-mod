@@ -179,6 +179,9 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   set in the dev menu or by a campaign pack used to vanish. A companion whose values differ from the table now gets
   a base of their own, which the game's level scaling grows from instead. It's rebuilt from the stats restored on
   load (Save extras), so it needs no file of its own. Companions that match their table level up as in vanilla.
+- **Siege allies attack** (`SiegeAllies.cs`): in a siege the game gives every army the plan meant for the city's
+  defenders, so allies attacking with you just walk to the nearest flag and hold it. Allied platoons in a siege now
+  attack (the game's own targeting: the city's flags or enemy units) and pick their first target at once.
 - **Save extras** (`DevSaveData.cs`): the game's save drops some values (your max health, morale and extra equipment
   slots; companions' Leadership, Intelligence, skills, unspent points, max health and most equipment slots), so every
   save also writes `FreemanSlop.json` into its folder and loading that save restores them once the world is up.
