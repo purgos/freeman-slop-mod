@@ -121,8 +121,8 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
     a Wars side column for war/peace between any two factions; Make All Hostile / Neutral / Allies.
   - **Companions:** you + every companion with status (in party / yours, away / prisoner / with a faction / free)
     and Edit / Max Lv / Recruit / "Recruit All Companions" (skips anyone already yours, per `Faction.GetAllHero`);
-    stat editor for level, health, morale, unspent points, attributes, skills, weapon proficiency, affection and
-    governor stats (cap 10), with Max All Attributes / Skills / Weapons / Companion Stats (zeroing those points).
+    stat editor for level, health, morale, unspent points, attributes, skills, weapon proficiency, affection (no cap,
+    as in the game; Max All Companion Stats sets it to 255) and governor stats (cap 10), with Max All Attributes / Skills / Weapons / Companion Stats (zeroing those points).
     Editing a companion shows only what they use: level, health, morale, Marksmanship, weapon stats and companion
     stats.
   - **Cities:** Take All Cities, and every city with its owner: press **Owner** on a city and **Give** it to any
@@ -155,6 +155,11 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   Marksmanship, Price (with or without gear, as the toggle says), Health, Weapon damage (their gun) or Armor (all
   their gear). The order holds after each purchase; the choice lasts for the session. Each soldier's row also shows
   a line with their damage, armor and health under level and marksmanship.
+- **Same-sex romance** (`SameSexRomance.cs`): the game only lets you propose to a companion of the other sex. A
+  same-sex companion now gets the same proposal line under the same rules (80+ affection, no partner yet), and from
+  there everything works as it does in vanilla: the romance lines at 90/120/150 affection, divorce, saving and the
+  "In Relationship" status. Some English proposal and acceptance lines assume a man and a woman; for a same-sex couple
+  those are replaced with a neutral line (other languages keep the original).
 - **Campaign packs** (`DevCampaigns.cs`, `CampaignMenu.cs`): the dev menu exports the current game as a campaign
   of its own, with a name and a paragraph-long description. It shows up in **New Game** after the game's story
   campaigns (Native mod only, since that's the only mod with that list), with the description and a summary, and

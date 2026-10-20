@@ -286,7 +286,7 @@ namespace FreemanFixes
                     }
                     foreach (int stat in group)
                     {
-                        DevStats.Set(mg, mh, stat, DevStats.Max(stat));
+                        DevStats.Set(mg, mh, stat, DevStats.MaxAllValue(stat));
                     }
                     DevStats.ClearUnspent(mg, mh, arg);
                     if (mh != null)
