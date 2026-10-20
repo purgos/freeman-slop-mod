@@ -9,6 +9,7 @@ namespace FreemanFixes
     internal static class DevStats
     {
         internal const int PlayerMaxLevel = 99;
+        internal const int MaxAffection = 255;
         internal const int Level = 1;
         internal const int MaxHealth = 2;
         internal const int Morale = 3;
@@ -155,7 +156,7 @@ namespace FreemanFixes
             {
                 return 5;
             }
-            if ((stat >= Armor && stat <= Throwing) || stat == Morale || stat == Affection)
+            if ((stat >= Armor && stat <= Throwing) || stat == Morale)
             {
                 return 100;
             }
@@ -167,7 +168,14 @@ namespace FreemanFixes
             {
                 return 10; // companion screen shows these as "x / 10" (HeroPoint)
             }
-            return 99999;
+            return 99999; // includes affection: the game has no ceiling (HeroRecruitCtrl.AddRelationship only floors it at 0)
+        }
+
+        // What the Max All buttons set: the cap, except affection, which has none, so it goes to MaxAffection
+        // (well past the 150 the last romance line needs, ShowDilogByTalk).
+        internal static int MaxAllValue(int stat)
+        {
+            return stat == Affection ? MaxAffection : Max(stat);
         }
 
         internal static int Get(NPCGen g, HeroAgent h, int stat)
