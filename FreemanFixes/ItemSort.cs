@@ -87,7 +87,6 @@ namespace FreemanFixes
                 {
                     continue;
                 }
-                categoryButtons[side].SetActive(!IsDevStoreSide(side));
                 extraRows[side].SetActive(devStore);
                 Inset(side, devStore ? 2 : 1);
                 UpdateLabels(side);
@@ -232,7 +231,7 @@ namespace FreemanFixes
             switch (kind)
             {
                 case SortButton.Category:
-                    Filter[side] = (Filter[side] + 1) % ItemCategories.Names.Length;
+                    Filter[side] = NextCategory(side);
                     break;
                 case SortButton.Direction:
                     HighFirst[side] = !HighFirst[side];
@@ -349,11 +348,55 @@ namespace FreemanFixes
             return ids;
         }
 
+        // All, then each category this side has, then back to All.
+        private static int NextCategory(int side)
+        {
+            Inventory inv = Side(side);
+            List<int> present = inv != null && inv.storage != null
+                ? ItemCategories.Present(inv.storage.items) : new List<int>();
+            foreach (int c in present)
+            {
+                if (c > Filter[side])
+                {
+                    return c;
+                }
+            }
+            return ItemCategories.All;
+        }
+
+        // The Category button only shows when the side has two or more categories; a filter whose items are all gone
+        // goes back to All.
+        private static void RefreshCategories(int side)
+        {
+            if (categoryButtons[side] == null)
+            {
+                return;
+            }
+            Inventory inv = Side(side);
+            List<int> present = inv != null && inv.storage != null
+                ? ItemCategories.Present(inv.storage.items) : new List<int>();
+            if (Filter[side] != ItemCategories.All && !present.Contains(Filter[side]))
+            {
+                Filter[side] = ItemCategories.All;
+                UpdateLabels(side);
+                if (inv != null)
+                {
+                    inv.Refresh();
+                }
+            }
+            categoryButtons[side].SetActive(!IsDevStoreSide(side) && (present.Count >= 2 || Filter[side] != ItemCategories.All));
+        }
+
         // Rebuild the side's dropdown from the stats its items have; fall back to Default if the sort no longer applies.
         internal static void RefreshOptions(int side)
         {
+            if (refreshing || !IsOpen())
+            {
+                return;
+            }
+            RefreshCategories(side);
             Dropdown d = keyDropdowns[side];
-            if (d == null || refreshing || !IsOpen())
+            if (d == null)
             {
                 return;
             }
@@ -478,17 +521,26 @@ namespace FreemanFixes
         }
     }
 
-    // Item categories, shared with the dev store's pages.
+    // Item categories, shared with the dev store's pages. Most items are the generic ItemType.ITEM, so the split
+    // follows what the game uses them for: Supplies are the construction materials it counts (Global.ItemWood /
+    // ItemIron / ItemTool, UICombat's construction costs), Useful are misc-slot gear (first aid kit, night vision,
+    // binoculars), weapon attachments (sights, silencers) and health items, and everything else of no use goes to
+    // General goods.
     internal static class ItemCategories
     {
         internal const int All = 0;
         internal const int Weapons = 1;
-        internal const int Clothing = 2;
-        internal const int Ammo = 3;
-        internal const int Medical = 4;
-        internal const int Other = 5;
+        internal const int Ammo = 2;
+        internal const int Clothing = 3;
+        internal const int Food = 4;
+        internal const int Supplies = 5;
+        internal const int Useful = 6;
+        internal const int GeneralGoods = 7;
 
-        internal static readonly string[] Names = { "All", "Weapons", "Clothing", "Ammo", "Food & Medical", "Other" };
+        internal static readonly string[] Names =
+        {
+            "All", "Weapons", "Ammo", "Clothing", "Food", "Supplies", "Useful", "General goods"
+        };
 
         internal static int Of(int id)
         {
@@ -504,17 +556,48 @@ namespace FreemanFixes
             Item item = RM.code.AllItem.TryGetValue(id, out t) && t != null ? t.GetComponent<Item>() : null;
             if (item == null)
             {
-                return Other;
+                return GeneralGoods;
             }
             if (item.ItemType == ItemType.AMMO)
             {
                 return Ammo;
             }
-            if (item.ItemType == ItemType.FOOD || item.ItemType == ItemType.HEALTH)
+            if (item.ItemType == ItemType.FOOD)
             {
-                return Medical;
+                return Food;
             }
-            return Other;
+            if (id == Global.ItemWood || id == Global.ItemIron || id == Global.ItemTool)
+            {
+                return Supplies;
+            }
+            if (item.ItemType == ItemType.HEALTH || item.ItemType == ItemType.ATTACHMENT
+                || (item.SlotType >= SlotType.MISC && item.SlotType <= SlotType.MISC12))
+            {
+                return Useful;
+            }
+            return GeneralGoods;
+        }
+
+        // The categories present among ids, in Names order (All not included).
+        internal static List<int> Present(List<int> ids)
+        {
+            var seen = new bool[Names.Length];
+            foreach (int id in ids)
+            {
+                if (id != 0)
+                {
+                    seen[Of(id)] = true;
+                }
+            }
+            var result = new List<int>();
+            for (int c = 1; c < Names.Length; c++)
+            {
+                if (seen[c])
+                {
+                    result.Add(c);
+                }
+            }
+            return result;
         }
     }
 

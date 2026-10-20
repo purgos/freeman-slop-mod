@@ -136,13 +136,16 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   armory, loot) has a row of buttons across the top of each side's grid, yours and theirs, with or without dev mode
   (the game's price ▲▼ buttons are hidden, since Sort: Price does the same; the dev store's page, Free and Clear Bag
   buttons sit in a second row):
-  - **Category:** All / Weapons / Clothing / Ammo / Food & Medical / Other. It only hides the other items from view;
-    nothing moves.
-  - **Sort** (a dropdown): Default (the game's order), Price, Name, Damage, Velocity, Fire rate, Magazine, Marksmanship req.,
-    Armor, Camouflage, Armor req. (the same number as Armor: the game requires that much Armor Proficiency) or
-    Food amount. Items
-    without that stat go last. The dropdown only lists the stats something on that side has (in its category; for
-    the dev store, the current page's category), and a sort that stops applying falls back to Default.
+  - **Category:** cycles All and the categories that side actually has (hidden when it has only one): Weapons,
+    Ammo, Clothing, Food, Supplies (wood, iron, tools: the construction materials), Useful (misc-slot gear like the
+    first aid kit, night vision and binoculars, plus weapon attachments: sights, silencers) and General goods
+    (everything the game has no use for). It only hides the other items from view; nothing moves. The dev store's
+    pages use the same categories.
+  - **Sort** (a dropdown): Default (the game's order), Price, Name, Damage, Velocity, Fire rate, Magazine,
+    Marksmanship req., Armor, Camouflage, Armor req. (the same number as Armor: the game requires that much Armor
+    Proficiency) or Food amount. Items without that stat go last. The dropdown only lists the stats something on that
+    side has (in its category; for the dev store, the current page's category), and a sort that stops applying falls
+    back to Default.
   - **High first / Low first** (A to Z / Z to A for Name).
 
   The sort stays applied as items move, keeps your bag's special slots in place and doesn't disturb a pending trade.
