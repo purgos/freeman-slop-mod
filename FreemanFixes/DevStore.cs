@@ -411,6 +411,7 @@ namespace FreemanFixes
                 {
                     pageDropdown.ClearOptions();
                     pageDropdown.AddOptions(pageNames); // the page count per category changes with the sort
+                    TradeButtons.FitList(pageDropdown);
                 }
                 else
                 {
@@ -444,6 +445,7 @@ namespace FreemanFixes
             if (pageDropdown != null)
             {
                 pageDropdown.AddOptions(Instance.pageNames);
+                TradeButtons.FitList(pageDropdown);
                 PageDropdown handler = pageDropdown.gameObject.AddComponent<PageDropdown>();
                 pageDropdown.onValueChanged.AddListener(new UnityAction<int>(handler.Changed));
             }
@@ -454,7 +456,7 @@ namespace FreemanFixes
         private static Text AddControl(Button template, Transform row, string label, int kind, float width, float flexible)
         {
             Text t = TradeButtons.Clone(template, row, label, width, flexible);
-            GameObject go = t.GetComponentInParent<Button>().gameObject;
+            GameObject go = TradeButtons.ButtonOf(t).gameObject;
             go.name = "FreemanSlop_Store_" + kind;
             var sb = go.AddComponent<StoreButton>();
             sb.Kind = kind;

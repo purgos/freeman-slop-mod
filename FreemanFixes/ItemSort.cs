@@ -208,7 +208,7 @@ namespace FreemanFixes
 
         private static GameObject Handle(Text label, int side, int kind)
         {
-            GameObject button = label.GetComponentInParent<Button>().gameObject; // just built, so still active
+            GameObject button = TradeButtons.ButtonOf(label).gameObject;
             SortButton b = button.AddComponent<SortButton>();
             b.Side = side;
             b.Kind = kind;
@@ -428,6 +428,7 @@ namespace FreemanFixes
                 }
                 d.ClearOptions();
                 d.AddOptions(names);
+                TradeButtons.FitList(d);
             }
             int index = keys.IndexOf(Key[side]);
             if (d.value != index)
@@ -798,6 +799,7 @@ namespace FreemanFixes
         }
 
         private static bool dropdownDumped;
+        private const float ListPadding = 4f;
 
         // A dropdown cloned from the settings screen's (UISettings.shadowQualityDropdown), or a companion row's AI
         // dropdown (HeroShow.dropdown) before the settings screen exists, with no options and no listeners.
@@ -848,6 +850,40 @@ namespace FreemanFixes
                 DepositPanelUi.DumpHierarchy(go.transform, "Trade screen dropdown");
             }
             return d;
+        }
+
+        // The button a cloned label belongs to. Not GetComponentInParent: Unity 2018 skips inactive objects there, and
+        // controls are often built while their screen is still hidden.
+        internal static Button ButtonOf(Text label)
+        {
+            for (Transform t = label.transform; t != null; t = t.parent)
+            {
+                Button b = t.GetComponent<Button>();
+                if (b != null)
+                {
+                    return b;
+                }
+            }
+            return null;
+        }
+
+        // Make the dropdown's list tall enough for every option, so it opens fully with no scrolling (the cloned
+        // settings dropdown's list fits about five).
+        internal static void FitList(Dropdown d)
+        {
+            if (d == null || d.template == null)
+            {
+                return;
+            }
+            Toggle item = d.template.GetComponentInChildren<Toggle>(true);
+            float itemHeight = item != null ? ((RectTransform)item.transform).rect.height : 0f;
+            if (itemHeight <= 0f)
+            {
+                return;
+            }
+            Vector2 size = d.template.sizeDelta;
+            size.y = itemHeight * d.options.Count + ListPadding;
+            d.template.sizeDelta = size;
         }
     }
 
