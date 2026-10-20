@@ -27,6 +27,8 @@ namespace FreemanFixes
         private Text statsHeader;
         private readonly List<HeroAgent> heroes = new List<HeroAgent>(); // index 0 = null = the player
         private readonly Dictionary<int, GameObject> companionOnlyRows = new Dictionary<int, GameObject>();
+        // Hidden while editing a companion: what the game doesn't use for them (DevStats.PlayerOnly).
+        private readonly List<GameObject> playerOnlyRows = new List<GameObject>();
         private int selected;
 
         private GameObject Page(RectTransform root, string name)
@@ -84,7 +86,9 @@ namespace FreemanFixes
             Transform maxRow = Row(c1);
             MakeButton(maxRow, "Max All Attributes", ActMaxGroup, 0).gameObject
                 .AddComponent<LayoutElement>().flexibleWidth = 1f;
+            playerOnlyRows.Add(maxRow.gameObject);
             Transform c2 = Column(page, StatColumnWidth);
+            playerOnlyRows.Add(c2.gameObject); // the whole Skills column
             Header(c2, "Skills");
             foreach (int stat in DevStats.Skills)
             {
@@ -129,6 +133,10 @@ namespace FreemanFixes
             if (DevStats.CompanionOnly(stat))
             {
                 companionOnlyRows[stat] = row.gameObject;
+            }
+            else if (DevStats.PlayerOnly(stat))
+            {
+                playerOnlyRows.Add(row.gameObject);
             }
         }
 
@@ -197,6 +205,10 @@ namespace FreemanFixes
             foreach (KeyValuePair<int, GameObject> kv in companionOnlyRows)
             {
                 kv.Value.SetActive(h != null);
+            }
+            foreach (GameObject row in playerOnlyRows)
+            {
+                row.SetActive(h == null);
             }
             foreach (int stat in DevStats.VitalsAndAttributes)
             {

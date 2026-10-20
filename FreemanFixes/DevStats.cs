@@ -83,6 +83,21 @@ namespace FreemanFixes
             return stat >= Affection;
         }
 
+        // Not shown when editing a companion: free points, the attributes other than Marksmanship, and skills.
+        // Companions fight on Marksmanship and weapon stats (NPCGen.SetLevel scales those from their soldier row).
+        internal static bool PlayerOnly(int stat)
+        {
+            switch (stat)
+            {
+                case Level:
+                case MaxHealth:
+                case Morale:
+                case Marksmanship:
+                    return false;
+            }
+            return !CompanionOnly(stat) && (stat < Armor || stat > Throwing);
+        }
+
         // Labels match the character screen's wording.
         internal static string Label(int stat)
         {

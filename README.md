@@ -123,6 +123,8 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
     and Edit / Max Lv / Recruit / "Recruit All Companions" (skips anyone already yours, per `Faction.GetAllHero`);
     stat editor for level, health, morale, unspent points, attributes, skills, weapon proficiency, affection and
     governor stats (cap 10), with Max All Attributes / Skills / Weapons / Companion Stats (zeroing those points).
+    Editing a companion shows only what they use: level, health, morale, Marksmanship, weapon stats and companion
+    stats.
   - **Cities:** Take All Cities, and every city with its owner: press **Owner** on a city and **Give** it to any
     faction. A change that would leave a faction with nothing (so the game destroys it) asks for a second click.
     Replaces the cheat panel's AddAllCity / AddRecentlyCity, which are hidden in dev mode.
