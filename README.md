@@ -128,7 +128,23 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
     Replaces the cheat panel's AddAllCity / AddRecentlyCity, which are hidden in dev mode.
   - **Item store:** a trader with one of every item that never runs out (restocked after every click, keeping
     anything you sold so Revert works), in category pages of up to 200 (the trade grid is a fixed 250 slots); page,
-    Free and two-click Clear Bag controls in the trade screen's top bar; Deal works for free trades.
+    Free and two-click Clear Bag controls over the grids (the page is a dropdown of every page); Deal works for free trades. Sorting the
+    store's side (see Item sort and filter) re-pages each whole category in that order.
+- **Item sort and filter** (`ItemSort.cs`): every item exchange screen (traders, the dev store, city storage, the
+  armory, loot) has a row of buttons across the top of each side's grid, yours and theirs, with or without dev mode
+  (the game's price ▲▼ buttons are hidden, since Sort: Price does the same; the dev store's page, Free and Clear Bag
+  buttons sit in a second row):
+  - **Category:** All / Weapons / Clothing / Ammo / Food & Medical / Other. It only hides the other items from view;
+    nothing moves.
+  - **Sort** (a dropdown): Default (the game's order), Price, Name, Damage, Velocity, Fire rate, Magazine, Marksmanship req.,
+    Armor, Camouflage, Armor req. (the same number as Armor: the game requires that much Armor Proficiency) or
+    Food amount. Items
+    without that stat go last. The dropdown only lists the stats something on that side has (in its category; for
+    the dev store, the current page's category), and a sort that stops applying falls back to Default.
+  - **High first / Low first** (A to Z / Z to A for Name).
+
+  The sort stays applied as items move, keeps your bag's special slots in place and doesn't disturb a pending trade.
+  Settings last for the session. The dev store keeps its own category pages instead of the Category button.
 - **Campaign packs** (`DevCampaigns.cs`, `CampaignMenu.cs`): the dev menu exports the current game as a campaign
   of its own, with a name and a paragraph-long description. It shows up in **New Game** after the game's story
   campaigns (Native mod only, since that's the only mod with that list), with the description and a summary, and

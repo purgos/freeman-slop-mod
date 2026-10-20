@@ -9,14 +9,15 @@ namespace FreemanFixes
     // every item that never runs out: after every click in the trade screen the page is restocked (taking an item
     // from a trader removes it and compacts the list, InventorySlot.Select), keeping anything you sold to it so
     // Revert still works. The merchant grid is a fixed 250 slots (Inventory.Initiate), so stock is split into category
-    // pages of up to 200 items, leaving room to sell. Page and Free controls are clones of the screen's Deal button in
-    // the empty left part of its top bar. Free zeroes Item.GetBuyCost.
+    // pages of up to 200 items, leaving room to sell. Page and Free controls (clones of the screen's Deal button) sit in
+    // the second row ItemSort puts over the store's grid, and Clear Bag in the one over your bag. Free zeroes
+    // Item.GetBuyCost. The trade screen's sort (ItemSort) re-pages
+    // each whole category in the chosen order (ApplySort), so page 1 holds the best of the category, not of a slice.
     internal class DevStore : MonoBehaviour
     {
         private const int ItemsPerPage = 200; // of the 250 merchant slots; the rest takes items you sell
         private const int Slots = 250;
         private const int StoreCredits = 99999999;
-        private const string RowName = "FreemanSlop_StoreControls";
 
         internal static DevStore Instance;
 
@@ -24,10 +25,14 @@ namespace FreemanFixes
         private Merchant merchant;
         private readonly List<string> pageNames = new List<string>();
         private readonly List<List<int>> pages = new List<List<int>>();
+        private readonly List<List<int>> categories = new List<List<int>>(); // by ItemCategories id, unsorted
         private int page;
+        private int sortKey = ItemStats.Default;
+        private bool sortHighFirst = true;
 
-        private static GameObject controlsRow;
-        private static Text pageLabel;
+        private static bool controlsBuilt;
+        private static Dropdown pageDropdown;
+        private static bool syncingPage; // Unity 2018 has no Dropdown.SetValueWithoutNotify
         private static Text freeLabel;
         private static Text clearLabel;
         private const string ClearText = "Clear Bag";
@@ -92,11 +97,8 @@ namespace FreemanFixes
             {
                 UITrading.code.Quit();
             }
-            if (controlsRow != null)
-            {
-                Destroy(controlsRow);
-            }
-            controlsRow = null;
+            controlsBuilt = false; // the buttons go with ItemSort's rows
+            pageDropdown = null;
             if (Instance != null)
             {
                 Destroy(Instance.gameObject);
@@ -129,17 +131,14 @@ namespace FreemanFixes
             }
         }
 
-        // Called from UITrading.OnEnable: show our controls only while the dev store is the merchant.
+        // Called from UITrading.OnEnable; ItemSort shows the rows holding our controls only while the dev store is the
+        // merchant.
         internal static void SyncControls(UITrading trading)
         {
             bool ours = Instance != null && trading.isTrading && trading.merchantInventory.storage == Instance.storage;
-            if (ours && controlsRow == null)
+            if (ours && !controlsBuilt)
             {
                 BuildControls(trading);
-            }
-            if (controlsRow != null)
-            {
-                controlsRow.SetActive(ours);
             }
             if (ours)
             {
@@ -149,11 +148,11 @@ namespace FreemanFixes
 
         private void BuildPages()
         {
-            var weapons = new List<int>();
-            var clothes = new List<int>();
-            var ammo = new List<int>();
-            var medical = new List<int>();
-            var other = new List<int>();
+            categories.Clear();
+            for (int c = 0; c < ItemCategories.Names.Length; c++)
+            {
+                categories.Add(new List<int>());
+            }
             foreach (KeyValuePair<int, Transform> kv in RM.code.AllItem)
             {
                 Item item = kv.Value != null ? kv.Value.GetComponent<Item>() : null;
@@ -161,38 +160,59 @@ namespace FreemanFixes
                 {
                     continue;
                 }
-                if (RM.code.AllWeaponsItem.ContainsKey(kv.Key))
+                categories[ItemCategories.Of(kv.Key)].Add(kv.Key);
+            }
+            foreach (List<int> ids in categories)
+            {
+                ids.Sort();
+            }
+            Paginate();
+            Plugin.Log.LogInfo("Dev store: " + pages.Count + " pages from " + RM.code.AllItem.Count + " items");
+        }
+
+        private void Paginate()
+        {
+            pages.Clear();
+            pageNames.Clear();
+            for (int c = 1; c < categories.Count; c++) // 0 is "All"
+            {
+                List<int> ids = sortKey == ItemStats.Default ? categories[c]
+                    : ItemStats.Sorted(categories[c], sortKey, sortHighFirst, merchant);
+                AddCategory(ItemCategories.Names[c], ids);
+            }
+        }
+
+        internal static bool IsMerchant(Storage s)
+        {
+            return Instance != null && s != null && s == Instance.storage;
+        }
+
+        // ItemSort: re-page every category in this order, staying on the current category's first page.
+        internal static void ApplySort(int key, bool highFirst)
+        {
+            DevStore store = Instance;
+            if (store == null || (store.sortKey == key && store.sortHighFirst == highFirst) || store.pages.Count == 0)
+            {
+                return;
+            }
+            string current = Category(store.pageNames[store.page]);
+            store.sortKey = key;
+            store.sortHighFirst = highFirst;
+            store.Paginate();
+            int target = 0;
+            for (int i = 0; i < store.pageNames.Count; i++)
+            {
+                if (Category(store.pageNames[i]) == current)
                 {
-                    weapons.Add(kv.Key);
-                }
-                else if (RM.code.AllClothesItem.ContainsKey(kv.Key))
-                {
-                    clothes.Add(kv.Key);
-                }
-                else if (item.ItemType == ItemType.AMMO)
-                {
-                    ammo.Add(kv.Key);
-                }
-                else if (item.ItemType == ItemType.FOOD || item.ItemType == ItemType.HEALTH)
-                {
-                    medical.Add(kv.Key);
-                }
-                else
-                {
-                    other.Add(kv.Key);
+                    target = i;
+                    break;
                 }
             }
-            AddCategory("Weapons", weapons);
-            AddCategory("Clothing", clothes);
-            AddCategory("Ammo", ammo);
-            AddCategory("Food & Medical", medical);
-            AddCategory("Other", other);
-            Plugin.Log.LogInfo("Dev store: " + pages.Count + " pages from " + RM.code.AllItem.Count + " items");
+            store.GoTo(target);
         }
 
         private void AddCategory(string name, List<int> ids)
         {
-            ids.Sort();
             int pageCount = (ids.Count + ItemsPerPage - 1) / ItemsPerPage;
             for (int p = 0; p < pageCount; p++)
             {
@@ -272,28 +292,13 @@ namespace FreemanFixes
             }
         }
 
-        internal void Turn(int delta)
+        internal static void PickPage(int value)
         {
-            if (pages.Count == 0)
+            if (syncingPage || Instance == null || value < 0 || value >= Instance.pages.Count || value == Instance.page)
             {
                 return;
             }
-            GoTo((page + delta + pages.Count) % pages.Count);
-        }
-
-        // Label click: jump to the first page of the next category.
-        internal void NextCategory()
-        {
-            string current = Category(pageNames[page]);
-            for (int i = 1; i <= pages.Count; i++)
-            {
-                int candidate = (page + i) % pages.Count;
-                if (Category(pageNames[candidate]) != current)
-                {
-                    GoTo(candidate);
-                    return;
-                }
-            }
+            Instance.GoTo(value);
         }
 
         private static string Category(string pageName)
@@ -310,6 +315,26 @@ namespace FreemanFixes
             }
             page = newPage;
             Fill();
+            ItemSort.RefreshOptions(ItemSort.Other); // the sort stats on offer follow the page's category
+        }
+
+        // Every item of the current page's category (what the sort dropdown offers stats for).
+        internal static List<int> CurrentCategoryItems()
+        {
+            DevStore store = Instance;
+            if (store == null || store.pages.Count == 0)
+            {
+                return new List<int>();
+            }
+            string current = Category(store.pageNames[store.page]);
+            for (int c = 1; c < ItemCategories.Names.Length; c++)
+            {
+                if (ItemCategories.Names[c] == current)
+                {
+                    return store.categories[c];
+                }
+            }
+            return store.pages[store.page];
         }
 
         // Two clicks within a few seconds: empties your bag (not what you're wearing). Cancels any pending trade first
@@ -379,9 +404,24 @@ namespace FreemanFixes
 
         private void UpdateLabels()
         {
-            if (pageLabel != null && page < pageNames.Count)
+            if (pageDropdown != null && page < pageNames.Count)
             {
-                pageLabel.text = pageNames[page];
+                syncingPage = true;
+                if (pageDropdown.options.Count != pageNames.Count)
+                {
+                    pageDropdown.ClearOptions();
+                    pageDropdown.AddOptions(pageNames); // the page count per category changes with the sort
+                }
+                else
+                {
+                    for (int i = 0; i < pageNames.Count; i++)
+                    {
+                        pageDropdown.options[i].text = pageNames[i];
+                    }
+                }
+                pageDropdown.value = page;
+                pageDropdown.RefreshShownValue();
+                syncingPage = false;
             }
             if (freeLabel != null)
             {
@@ -391,80 +431,48 @@ namespace FreemanFixes
 
         private static void BuildControls(UITrading trading)
         {
-            Button deal = null;
-            foreach (Button b in trading.GetComponentsInChildren<Button>(true))
+            Transform storeRow = ItemSort.ExtraRow(trading, ItemSort.Other);
+            Transform bagRow = ItemSort.ExtraRow(trading, ItemSort.Bag);
+            if (storeRow == null || bagRow == null)
             {
-                for (int i = 0; i < b.onClick.GetPersistentEventCount(); i++)
-                {
-                    if (b.onClick.GetPersistentMethodName(i) == "Deal")
-                    {
-                        deal = b;
-                    }
-                }
-            }
-            if (deal == null || trading.isAutoSort == null)
-            {
-                Plugin.Log.LogWarning("Dev store: Deal button or top bar not found; store controls skipped");
+                Plugin.Log.LogWarning("Dev store: no control rows; store controls skipped");
                 return;
             }
-            // Top bar (holds the auto-sort toggle and sort buttons on its left half; right half is empty while trading).
-            Transform bar = trading.isAutoSort.transform.parent;
-            controlsRow = new GameObject(RowName, typeof(RectTransform));
-            var rt = (RectTransform)controlsRow.transform;
-            rt.SetParent(bar, false);
-            rt.anchorMin = new Vector2(0.5f, 0.5f);
-            rt.anchorMax = new Vector2(0.5f, 0.5f);
-            rt.pivot = new Vector2(0.5f, 0.5f);
-            // Left part of the bar is empty while trading; the auto-sort toggle and sort arrows sit on the right.
-            rt.anchoredPosition = new Vector2(-300f, -4f);
-            var dealRt = (RectTransform)deal.transform;
-            rt.sizeDelta = new Vector2(650f, dealRt.rect.height);
-            var row = controlsRow.AddComponent<HorizontalLayoutGroup>();
-            row.spacing = 6f;
-            row.childAlignment = TextAnchor.MiddleCenter;
-            row.childControlWidth = true;
-            row.childControlHeight = true;
-            row.childForceExpandWidth = false;
-            row.childForceExpandHeight = true;
-
-            AddControl(deal, "<", StoreButton.Prev, 50f);
-            pageLabel = AddControl(deal, "", StoreButton.Category, 220f);
-            AddControl(deal, ">", StoreButton.Next, 50f);
-            freeLabel = AddControl(deal, "", StoreButton.Free, 150f);
-            clearLabel = AddControl(deal, ClearText, StoreButton.ClearBag, 150f);
+            controlsBuilt = true;
+            Button deal = trading.btnDeal;
+            pageDropdown = TradeButtons.CloneDropdown(storeRow, "FreemanSlop_Store_Page", 3f);
+            if (pageDropdown != null)
+            {
+                pageDropdown.AddOptions(Instance.pageNames);
+                PageDropdown handler = pageDropdown.gameObject.AddComponent<PageDropdown>();
+                pageDropdown.onValueChanged.AddListener(new UnityAction<int>(handler.Changed));
+            }
+            freeLabel = AddControl(deal, storeRow, "", StoreButton.Free, 0f, 2f);
+            clearLabel = AddControl(deal, bagRow, ClearText, StoreButton.ClearBag, 150f, 0f);
         }
 
-        private static Text AddControl(Button template, string label, int kind, float width)
+        private static Text AddControl(Button template, Transform row, string label, int kind, float width, float flexible)
         {
-            GameObject go = Instantiate(template.gameObject, controlsRow.transform, false);
+            Text t = TradeButtons.Clone(template, row, label, width, flexible);
+            GameObject go = t.GetComponentInParent<Button>().gameObject;
             go.name = "FreemanSlop_Store_" + kind;
-            go.SetActive(true);
-            Button b = go.GetComponent<Button>();
-            b.onClick = new Button.ButtonClickedEvent();
-            b.interactable = true; // Deal is disabled while no trade is pending, and clones copy that state
-            Text t = go.GetComponentInChildren<Text>(true);
-            foreach (Component c in t.GetComponents<Component>())
-            {
-                // LocalizationText would overwrite our label with "Deal".
-                if (c != null && c.GetType().Name == "LocalizationText")
-                {
-                    DestroyImmediate(c);
-                }
-            }
-            t.text = label;
-            go.AddComponent<LayoutElement>().preferredWidth = width;
             var sb = go.AddComponent<StoreButton>();
             sb.Kind = kind;
-            b.onClick.AddListener(new UnityAction(sb.Click));
+            go.GetComponent<Button>().onClick.AddListener(new UnityAction(sb.Click));
             return t;
+        }
+    }
+
+    internal class PageDropdown : MonoBehaviour
+    {
+        public void Changed(int value)
+        {
+            DevStore.PickPage(value);
         }
     }
 
     internal class StoreButton : MonoBehaviour
     {
-        internal const int Prev = 1;
-        internal const int Next = 2;
-        internal const int Category = 3;
         internal const int Free = 4;
         internal const int ClearBag = 5;
 
@@ -479,15 +487,6 @@ namespace FreemanFixes
             }
             switch (Kind)
             {
-                case Prev:
-                    store.Turn(-1);
-                    break;
-                case Next:
-                    store.Turn(1);
-                    break;
-                case Category:
-                    store.NextCategory();
-                    break;
                 case Free:
                     store.ToggleFree();
                     break;
