@@ -62,7 +62,7 @@ Breaking these compiles fine but fails in game, usually silently or as a white o
 - Keep `README.md` current: add each fix under **Fixes** and each new pitfall under **Runtime gotchas**.
 
 ## Legal and repo rules
-- GPL-3.0. Commit only original code and docs. **Never commit or paste game code, decompiled output, game DLLs,
+- MIT. Commit only original code and docs. **Never commit or paste game code, decompiled output, game DLLs,
   assets or tables** (`decompiled/`, `decompiled-launcher/`, `vendor/` stay ignored).
 - GitHub (`origin`) is the source of truth; push and merge there. The Forgejo copy
   (git.purgos.lilium.wtf/purgos/freeman-slop-mod) is a read-only pull mirror (hourly), so never push to it.
