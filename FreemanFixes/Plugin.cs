@@ -45,6 +45,7 @@ namespace FreemanFixes
             SaveOnExit.Teardown();
             DevMode.Teardown();
             TalkMarkers.Teardown();
+            ItemSort.Teardown();
             Logger.LogInfo("Freeman Slop Mod unloaded");
             if (liveLog != null)
             {
