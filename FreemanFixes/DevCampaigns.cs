@@ -20,6 +20,8 @@ namespace FreemanFixes
     //    (every equipment slot, yours included), your
     //    bag (items + size), your money (InitMoney) and faction funds, and the political map: who owns every city,
     //    which factions are destroyed, your status/relation/trade/defense with every faction and all wars.
+    //  - Your attributes, skills and weapon stats are a base the character-creation answers add to, as vanilla adds
+    //    them to the background's (MapAgent.Initiate: table value + UICampaign bonus, capped like JudgeAllValue).
     //  - Everything else comes from the background picked in character creation.
     // The map goes in where a story campaign sets up its factions (Mainframe.LoadBattleData, before the factions buy
     // their map armies); relations and wars wait until the world has settled (DevCampaignRunner).
@@ -530,7 +532,7 @@ namespace FreemanFixes
             NPCGen me = MapAgent.code.gen;
             if (c.Player != null)
             {
-                c.Player.ApplyAttributesAndSkills(me);
+                c.Player.ApplyPlayerBase(me);
                 c.Player.ApplyTo(me);
                 // NPCGen.LevelUp's player formula, so the carried-over Constitution counts.
                 me.maxHealth = RM.code.TabPlayerPresetsData[me.Id].BaseHealth + me.constitution * Global.ConstitutionFactor;
@@ -971,6 +973,70 @@ namespace FreemanFixes
             ApplyStats(g, hero, DevStats.Attributes);
             ApplyStats(g, hero, DevStats.Skills);
             ApplyStats(g, hero, DevStats.Weapons);
+        }
+
+        // The player's attributes, skills and weapon stats: the pack's value plus what the character-creation answers
+        // added (DevStats.Set caps them as UICampaign.JudgeAllValue does).
+        internal void ApplyPlayerBase(NPCGen g)
+        {
+            if (Stats == null)
+            {
+                return;
+            }
+            ApplyPlayerStats(g, DevStats.Attributes);
+            ApplyPlayerStats(g, DevStats.Skills);
+            ApplyPlayerStats(g, DevStats.Weapons);
+        }
+
+        private void ApplyPlayerStats(NPCGen g, int[] ids)
+        {
+            foreach (int id in ids)
+            {
+                int v;
+                if (Stats.TryGetValue(id, out v))
+                {
+                    DevStats.Set(g, null, id, v + CreationBonus(id));
+                }
+            }
+        }
+
+        // What character creation's answers added to a stat (UICampaign's fields, read by MapAgent.Initiate).
+        private static int CreationBonus(int stat)
+        {
+            UICampaign ui = UICampaign.code;
+            if (ui == null)
+            {
+                return 0;
+            }
+            switch (stat)
+            {
+                case DevStats.Constitution: return ui.Constitution;
+                case DevStats.Marksmanship: return Mathf.RoundToInt(ui.Marksmanship);
+                case DevStats.Agility: return ui.Agility;
+                case DevStats.Leadership: return ui.Leadership;
+                case DevStats.Intelligence: return ui.Intelligence;
+                case DevStats.Commanding: return ui.Commanding;
+                case DevStats.PrisonerManagement: return ui.Prisonermanagement;
+                case DevStats.Training: return ui.Training;
+                case DevStats.InventoryManagement: return ui.inventorymanagement;
+                case DevStats.Navigation: return ui.Navigation;
+                case DevStats.Looting: return ui.Looting;
+                case DevStats.Medical: return ui.Medical;
+                case DevStats.FirstAid: return ui.Firstaid;
+                case DevStats.Trading: return ui.Trading;
+                case DevStats.Persuasion: return ui.Persuation;
+                case DevStats.Stealing: return ui.Stealing;
+                case DevStats.Armor: return ui.armorPoint;
+                case DevStats.Pistol: return ui.pistolPoint;
+                case DevStats.Smg: return ui.smgPoint;
+                case DevStats.Shotgun: return ui.shotGunPoint;
+                case DevStats.Rifle: return ui.riflePoint;
+                case DevStats.AssaultRifle: return ui.assaultRiflePoint;
+                case DevStats.MachineGun: return ui.machineGunPoint;
+                case DevStats.Launcher: return ui.launcherPoint;
+                case DevStats.Throwing: return ui.throwingPoint;
+                default: return 0;
+            }
         }
 
         // Affection and governor stats (HeroAgent fields, kept by the game's save).
