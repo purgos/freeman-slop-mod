@@ -135,7 +135,8 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   starts the same way a story does: Normal/Realistic, then the usual character creation with the game's own
   backgrounds (packs are never backgrounds). The campaign starts at the starting level: you are the character you
   just created and the party joins at its usual level. What the pack sets: your and your companions' attributes,
-  skills and weapon stats (a companion's Marksmanship and weapon stats become their base, see Companion bases)
+  skills and weapon stats (yours are a base your character-creation answers add to, as they add to a background's
+  in vanilla; a companion's Marksmanship and weapon stats become their base, see Companion bases)
   and companion stats (affection, governor stats); the whole party (soldier types + companions) in the same squads (names, icons, formations,
   slot positions) with everyone's exact loadout (every equipment slot, yours included); your bag, money and faction
   funds; and the political map: who owns every city, which factions are destroyed, your
