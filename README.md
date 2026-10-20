@@ -174,7 +174,8 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
 (ilspycmd 8.2 in `~/.dotnet/tools`).
 
 ## License
-Freeman Slop Mod is free software, licensed under the **GNU General Public License v3.0** — see [`LICENSE`](LICENSE).
+Freeman Slop Mod is licensed under the **MIT License** — see [`LICENSE`](LICENSE). Versions before the switch
+to MIT were released under GPL-3.0.
 It covers this repo's own code only. *Freeman: Guerrilla Warfare* and its code/assets belong to their developers and
 are not included or redistributed here; you need your own copy of the game. BepInEx is LGPL-2.1 and is installed
 separately.
