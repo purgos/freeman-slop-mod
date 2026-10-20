@@ -144,6 +144,10 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   no map and only hand over your own cities.
   Each export is a **campaign pack** (a small mod depending on this one) in `BepInEx/FreemanSlop_Mods/<name>/`
   (`manifest.json` with the required mod version, currently 0.5.0+, and `campaign.json`); copy the folder to share it. Packs load whether or not dev mode is on. Re-exporting a name asks for a second click.
+- **Unread talk marker** (`TalkMarkers.cs`): a companion's Talk button in the companions panel gets a red **(!)**
+  while they have an unread line (their life story, or a question their affection has unlocked), using the same
+  rule the talk window uses to grey out lines already heard. It clears once you've talked it through and closed the
+  window.
 - **Companion bases** (`CompanionBases.cs`): a companion's Marksmanship and weapon stats come from their soldier
   table row, and the game recomputes them from it on every level-up and every load (`NPCGen.SetLevel`), so values
   set in the dev menu or by a campaign pack used to vanish. A companion whose values differ from the table now gets
