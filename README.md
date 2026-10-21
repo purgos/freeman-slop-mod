@@ -187,6 +187,10 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
 - **Siege allies attack** (`SiegeAllies.cs`): in a siege the game gives every army the plan meant for the city's
   defenders, so allies attacking with you just walk to the nearest flag and hold it. Allied platoons in a siege now
   attack (the game's own targeting: the city's flags or enemy units) and pick their first target at once.
+- **Sieges end when you win** (`SiegeEnd.cs`): after you win a siege you joined, the city passed to your ally but
+  stayed "under siege" for hours, because the ally's own map battle with the city was never closed. It's now
+  settled as soon as you leave the battle: the ally's surviving troops move in as the garrison (no new ones are
+  made), as the game would have done later.
 - **Save extras** (`DevSaveData.cs`): the game's save drops some values (your max health, morale and extra equipment
   slots; companions' Leadership, Intelligence, skills, unspent points, max health and most equipment slots), so every
   save also writes `FreemanSlop.json` into its folder and loading that save restores them once the world is up.
