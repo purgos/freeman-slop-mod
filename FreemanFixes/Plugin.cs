@@ -47,6 +47,7 @@ namespace FreemanFixes
             TalkMarkers.Teardown();
             ItemSort.Teardown();
             RecruitSort.Teardown();
+            SquadAll.Teardown();
             Logger.LogInfo("Freeman Slop Mod unloaded");
             if (liveLog != null)
             {

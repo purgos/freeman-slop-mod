@@ -155,6 +155,10 @@ AI assistants: see [`AGENTS.md`](AGENTS.md) for the full style and runtime rules
   Marksmanship, Price (with or without gear, as the toggle says), Health, Weapon damage (their gun) or Armor (all
   their gear). The order holds after each purchase; the choice lasts for the session. Each soldier's row also shows
   a line with their damage, armor and health under level and marksmanship.
+- **Squad "All" buttons** (`SquadAll.cs`): the squads screen gets Equip All, Supply All and Reward All, each
+  sharing a row with the game's Auto Equip, Auto Replenishment and Reward Troops (the game's button keeps the left
+  half). They run the game's own action on every squad in turn; Reward All shows the total cost, only rewards squads
+  the game's button would (under 100 morale, someone able to fight) and stops when the coin runs out.
 - **Same-sex romance** (`SameSexRomance.cs`): the game only lets you propose to a companion of the other sex. A
   same-sex companion now gets the same proposal line under the same rules (80+ affection, no partner yet), and from
   there everything works as it does in vanilla: the romance lines at 90/120/150 affection, divorce, saving and the
