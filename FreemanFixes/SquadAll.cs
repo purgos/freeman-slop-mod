@@ -5,12 +5,15 @@ using UnityEngine.UI;
 
 namespace FreemanFixes
 {
-    // The squads screen (UIParty) has Auto Equip (AutoEquipClick), Auto Supply (AutoSupply) and Reward Troops
-    // (ButtonRewardSquad) buttons, but each only works on the selected squad (UIParty.selectedSquad), so a big army
-    // means clicking through every squad. We add Equip All, Supply All and Reward All, each a clone of the game's own
-    // button, which select every squad of your army in turn, run the game's method, and put the selection back.
-    // Reward All mirrors RefreshSelectedSquad's rule (a squad under 100 morale with someone able to fight) and its
-    // cost (Squad.GetCost * Global.RewardSquad); it pays squad by squad and stops when the coin runs out (AddCoin).
+    // The squads screen (UIParty) has Auto Equip (AutoEquipClick), Auto Supply (AutoSupply), Reward Troops
+    // (ButtonRewardSquad) and All Level Up (AllLevelUpClick) buttons, but each only works on the selected squad
+    // (UIParty.selectedSquad), so a big army means clicking through every squad. We add Equip All, Supply All,
+    // Reward All and Level Up All, each a clone of the game's own button, which select every squad of your army in
+    // turn, run the game's method, and put the selection back. Reward All mirrors RefreshSelectedSquad's rule (a squad
+    // under 100 morale with someone able to fight) and its cost (Squad.GetCost * Global.RewardSquad); Level Up All
+    // mirrors RefreshLevelUpBTN's (a unit past its next level's exp and under Global.NPCGenMaxLevel, at
+    // NPCGen.GetLevelUpCost, one level per click as in the game). Both pay squad by squad and stop when the coin runs
+    // out (AddCoin).
     internal static class SquadAll
     {
         private const float Gap = 6f; // between a game button and its "All" copy
@@ -22,6 +25,8 @@ namespace FreemanFixes
         private static Button supplyAll;
         private static Button rewardAll;
         private static Text rewardLabel;
+        private static Button levelAll;
+        private static Text levelLabel;
         private static bool busy;
 
         // What we changed on the game's own objects, for Teardown.
@@ -44,7 +49,8 @@ namespace FreemanFixes
 
         internal static void Ensure(UIParty ui)
         {
-            if (equipAll != null || ui.btnAutoEquip == null || ui.btnAutoSupply == null || ui.btnRewardSquad == null)
+            if (equipAll != null || ui.btnAutoEquip == null || ui.btnAutoSupply == null || ui.btnRewardSquad == null
+                || ui.btnAllLevelUp == null)
             {
                 return;
             }
@@ -62,6 +68,9 @@ namespace FreemanFixes
             rewardAll = Clone(ui.btnRewardSquad, "Reward All", out control);
             rewardAll.onClick.AddListener(new UnityAction(control.RewardAll));
             rewardLabel = rewardAll.transform.GetChild(0).GetComponent<Text>();
+            levelAll = Clone(ui.btnAllLevelUp, "Level Up All", out control);
+            levelAll.onClick.AddListener(new UnityAction(control.LevelAll));
+            levelLabel = levelAll.transform.GetChild(0).GetComponent<Text>();
         }
 
         // The column (a VerticalLayoutGroup, "Squad Buttons") centres each button. A halved button would move to the
@@ -171,7 +180,7 @@ namespace FreemanFixes
             {
                 return;
             }
-            foreach (Button b in new Button[] { equipAll, supplyAll, rewardAll })
+            foreach (Button b in new Button[] { equipAll, supplyAll, rewardAll, levelAll })
             {
                 b.GetComponent<SquadAllControl>().Place();
                 b.gameObject.SetActive(b.GetComponent<SquadAllControl>().Original.gameObject.activeSelf);
@@ -189,6 +198,20 @@ namespace FreemanFixes
             rewardAll.interactable = count > 0;
             rewardLabel.color = count > 0 ? Color.white : rewardAll.colors.disabledColor;
             rewardLabel.text = count > 0 ? "Reward All (-" + cost + ")" : "Reward All";
+            cost = 0;
+            count = 0;
+            foreach (Squad s in Squads())
+            {
+                int c = LevelUpCost(s);
+                if (c > 0)
+                {
+                    cost += c;
+                    count++;
+                }
+            }
+            levelAll.interactable = count > 0;
+            levelLabel.color = count > 0 ? Color.white : levelAll.colors.disabledColor;
+            levelLabel.text = count > 0 ? "Level Up All (-" + cost + ")" : "Level Up All";
         }
 
         internal static void EquipAll()
@@ -206,6 +229,11 @@ namespace FreemanFixes
             ForEachSquad(2);
         }
 
+        internal static void LevelAll()
+        {
+            ForEachSquad(3);
+        }
+
         private static void ForEachSquad(int action)
         {
             UIParty ui = UIParty.code;
@@ -220,7 +248,7 @@ namespace FreemanFixes
             {
                 foreach (Squad s in Squads())
                 {
-                    if (action == 2 && !CanReward(s))
+                    if ((action == 2 && !CanReward(s)) || (action == 3 && LevelUpCost(s) <= 0))
                     {
                         continue;
                     }
@@ -232,6 +260,15 @@ namespace FreemanFixes
                     else if (action == 1)
                     {
                         ui.AutoSupply();
+                    }
+                    else if (action == 3)
+                    {
+                        if (MapAgent.code._Storage.credits < LevelUpCost(s))
+                        {
+                            break; // out of coin (AllLevelUpClick's AddCoin would refuse)
+                        }
+                        ui.RefreshLevelUpBTN(); // fills the game's list of units to level for this squad
+                        ui.AllLevelUpClick(); // pays and levels
                     }
                     else
                     {
@@ -250,7 +287,7 @@ namespace FreemanFixes
                 busy = false;
                 ui.Refresh();
             }
-            Plugin.Log.LogInfo("Squad all: " + (action == 0 ? "equipped" : action == 1 ? "supplied" : "rewarded") + " "
+            Plugin.Log.LogInfo("Squad all: " + (action == 0 ? "equipped" : action == 1 ? "supplied" : action == 2 ? "rewarded" : "levelled up") + " "
                 + done + " squad(s)");
         }
 
@@ -283,10 +320,25 @@ namespace FreemanFixes
             return (int)((float)s.GetCost() * Global.RewardSquad);
         }
 
+        // What the squad's All Level Up would cost (RefreshLevelUpBTN's rule); 0 when nobody can level.
+        private static int LevelUpCost(Squad s)
+        {
+            int cost = 0;
+            foreach (Transform t in s.OriginalUnits)
+            {
+                NPCGen g = t != null ? t.GetComponent<NPCGen>() : null;
+                if (g != null && g.curExp > g.nextExp && g.Level < Global.NPCGenMaxLevel)
+                {
+                    cost += g.GetLevelUpCost();
+                }
+            }
+            return cost;
+        }
+
         // Hot reload: remove the buttons.
         internal static void Teardown()
         {
-            foreach (Button b in new Button[] { equipAll, supplyAll, rewardAll })
+            foreach (Button b in new Button[] { equipAll, supplyAll, rewardAll, levelAll })
             {
                 if (b != null)
                 {
@@ -297,6 +349,8 @@ namespace FreemanFixes
             supplyAll = null;
             rewardAll = null;
             rewardLabel = null;
+            levelAll = null;
+            levelLabel = null;
             foreach (Halved h in halved)
             {
                 if (h.button != null)
@@ -353,6 +407,11 @@ namespace FreemanFixes
         public void RewardAll()
         {
             SquadAll.RewardAll();
+        }
+
+        public void LevelAll()
+        {
+            SquadAll.LevelAll();
         }
     }
 
