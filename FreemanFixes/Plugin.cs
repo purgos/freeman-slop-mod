@@ -48,6 +48,7 @@ namespace FreemanFixes
             ItemSort.Teardown();
             RecruitSort.Teardown();
             SquadAll.Teardown();
+            RestScreens.Teardown();
             Logger.LogInfo("Freeman Slop Mod unloaded");
             if (liveLog != null)
             {
